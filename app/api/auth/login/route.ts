@@ -206,6 +206,38 @@ async function buildLoginSuccessResponse(
 
   console.log(`User role resolved: ${userRoleText}, Status: ${statusText}, Redirecting to: ${redirectUrl}`);
 
+  // Tự động đồng bộ cơ sở trực thuộc từ LMS nếu là tài khoản LMS
+  if (userData.is_firebase || !userData.password_hash || String(userData.password_hash).startsWith("LMS_")) {
+    (async () => {
+      try {
+        const { getUserCentres, syncLmsCentresForUser } = await import("@/lib/services/user-centres-service");
+        const existingCentres = await getUserCentres(userData.id);
+        if (existingCentres.length === 0) {
+          // Thử lấy từ getOwnCentres với chính idToken của người dùng
+          const lmsRes = await fetch("https://lms-api.mindx.edu.vn/graphql", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${firebaseData.idToken}`,
+            },
+            body: JSON.stringify({
+              query: `query { getOwnCentres { centres { id name shortName } } }`,
+            }),
+          });
+          const lmsData = await lmsRes.json();
+          const ownCentres = lmsData.data?.getOwnCentres?.centres;
+          if (Array.isArray(ownCentres) && ownCentres.length > 0) {
+            await syncLmsCentresForUser(userData.id, lmsCode, userData.full_name, firebaseData.idToken, ownCentres);
+          } else {
+            await syncLmsCentresForUser(userData.id, lmsCode, userData.full_name, firebaseData.idToken);
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi đồng bộ cơ sở khi đăng nhập:", err);
+      }
+    })();
+  }
+
   const res = NextResponse.json(
     {
       success: true,

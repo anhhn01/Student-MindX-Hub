@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getRolePoints } from "@/lib/constants/roles";
 import {
-  readStoredPermissions,
-  saveStoredPermissions,
+  getMemoryPermissions,
+  updateMemoryPermissions,
 } from "@/lib/services/permissions-service";
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -29,7 +29,7 @@ const DEFAULT_MENU_TREE = [
         id: "menu_user_management",
         code: "user_management",
         name: "Quản lý tài khoản",
-        path: "/admin/users",
+        path: "/[role]/system-management/users",
         is_parent: false,
         parent_code: "system_management",
       },
@@ -37,21 +37,42 @@ const DEFAULT_MENU_TREE = [
         id: "menu_screen_permission",
         code: "screen_permission_management",
         name: "Quản lý phân quyền màn hình",
-        path: "/admin/permissions",
+        path: "/[role]/system-management/screen_permission",
+        is_parent: false,
+        parent_code: "system_management",
+      },
+      {
+        id: "menu_user_centre",
+        code: "user_centre_management",
+        name: "Quản lý cơ sở trực thuộc",
+        path: "/[role]/system-management/user_centres",
         is_parent: false,
         parent_code: "system_management",
       },
     ],
   },
+  {
+    id: "menu_data_inspection",
+    code: "data_inspection",
+    name: "Kiểm tra dữ liệu",
+    is_parent: true,
+    children: [
+      {
+        id: "menu_trial_schedules",
+        code: "trial_schedules",
+        name: "Lịch trải nghiệm",
+        path: "/[role]/data-inspection/trial_schedules",
+        is_parent: false,
+        parent_code: "data_inspection",
+      },
+    ],
+  },
 ];
-
-// Fallback permissions default
-let memoryPermissions: Record<string, Record<string, boolean>> = readStoredPermissions();
 
 export async function GET() {
   try {
     // 1. Lấy danh sách vai trò từ Supabase
-    const { data: rolesData, error: rolesError } = await supabase
+    const { data: rolesData } = await supabase
       .from("roles")
       .select("id, name");
 
@@ -92,19 +113,19 @@ export async function GET() {
       }));
     }
 
-    // 3. Đọc phân quyền từ bộ lưu trữ vĩnh viễn data/permissions.json
-    const storedPerms = readStoredPermissions();
+    // 3. Khởi tạo phân quyền mặc định
+    const cachedPerms = getMemoryPermissions();
     let permissionsResult: Record<string, Record<string, boolean>> = {};
 
     for (const r of roles) {
-      permissionsResult[r.name] = storedPerms[r.name] || {
+      permissionsResult[r.name] = cachedPerms[r.name] || {
         system_management: false,
         user_management: false,
         screen_permission_management: false,
       };
     }
 
-    // Thử truy vấn bảng role_menu_permissions nếu đã có
+    // 4. Ưu tiên truy vấn trực tiếp từ bảng role_menu_permissions trên Supabase
     const { data: dbPerms, error: permError } = await supabase
       .from("role_menu_permissions")
       .select("is_enabled, roles ( name ), menus ( code )");
@@ -120,6 +141,8 @@ export async function GET() {
           permissionsResult[roleName][menuCode] = row.is_enabled;
         }
       }
+      // Cập nhật lại cache đồng bộ từ database
+      updateMemoryPermissions(permissionsResult);
     }
 
     // Đảm bảo Admin luôn có full quyền truy cập
@@ -162,7 +185,7 @@ export async function PUT(request: NextRequest) {
     const currentUserPoints = getRolePoints(currentUserRole);
     const targetRolePoints = getRolePoints(role_name);
 
-    // 2. Ràng buộc: Không được tự update cho chính role hiện tại và những role cao hơn mình, chỉ được nhỏ hơn mình thôi
+    // 2. Ràng buộc: Không được tự update cho chính role hiện tại và những role cao hơn mình
     if (targetRolePoints <= currentUserPoints) {
       return NextResponse.json(
         {
@@ -176,7 +199,7 @@ export async function PUT(request: NextRequest) {
     const isParent = menu_code === "system_management";
     const childCodes = ["user_management", "screen_permission_management"];
 
-    const allPerms = readStoredPermissions();
+    const allPerms = getMemoryPermissions();
     if (!allPerms[role_name]) {
       allPerms[role_name] = {
         system_management: false,
@@ -212,11 +235,10 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Lưu vĩnh viễn vào file data/permissions.json
-    saveStoredPermissions(allPerms);
-    memoryPermissions = { ...allPerms };
+    // Cập nhật bộ nhớ cache
+    updateMemoryPermissions(allPerms);
 
-    // Đồng bộ vào Supabase Database nếu các bảng đã tồn tại
+    // Lưu trực tiếp vào Supabase Database
     try {
       const { data: roleRow } = await supabase
         .from("roles")
@@ -231,7 +253,7 @@ export async function PUT(request: NextRequest) {
 
         if (menusRows && menusRows.length > 0) {
           const updates: { role_id: string; menu_id: string; is_enabled: boolean }[] = [];
-          for (const [code, enabled] of Object.entries(memoryPermissions[role_name])) {
+          for (const [code, enabled] of Object.entries(allPerms[role_name])) {
             const menuObj = menusRows.find((m) => m.code === code);
             if (menuObj) {
               updates.push({
@@ -250,14 +272,14 @@ export async function PUT(request: NextRequest) {
         }
       }
     } catch (dbErr) {
-      console.warn("Không thể lưu trực tiếp vào Supabase (chưa chạy migration):", dbErr);
+      console.warn("Không thể lưu trực tiếp vào Supabase (chưa có bảng trên Supabase):", dbErr);
     }
 
     return NextResponse.json({
       success: true,
       message: `Đã cập nhật phân quyền cho vai trò "${role_name}"`,
       role: role_name,
-      permissions: memoryPermissions[role_name],
+      permissions: allPerms[role_name],
     });
   } catch (err) {
     console.error("Lỗi khi cập nhật phân quyền màn hình:", err);

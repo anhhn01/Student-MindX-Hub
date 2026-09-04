@@ -422,13 +422,165 @@ Khi người dùng truy cập vào bất kỳ đường dẫn nào không tồn 
    - Đối với bất kỳ màn hình nào đã trang bị nút "Làm mới" / "Cập nhật" (như Màn hình Quản lý tài khoản, Phân quyền màn hình): **Tuyệt đối không chạy polling tự động ngầm (`setInterval`)**, dữ liệu chỉ tải lại khi người dùng bấm nút làm mới hoặc sau khi hoàn tất hành động thêm/sửa/xóa/toggle.
    - Đối với dữ liệu định danh người dùng (Họ tên, Vai trò): Luôn truy vấn trực tiếp từ Supabase Database theo thời gian thực (Real-time).
 10. **Quy Chuẩn Bảng Điều Khiển Theo Vai Trò (Role Dashboards Standard)**:
-    - **Admin Dashboard (`/admin/dashboard`)**: Trang tổng quan điều hành của Quản trị viên, gồm Banner Ruby-Obsidian, Card *Tổng số tài khoản* (lấy trực tiếp từ Supabase DB) và Card *Tổng lượt truy cập*, kèm Card *Trạng thái hệ thống* và các phím tắt điều hướng nhanh tới *Quản lý tài khoản* (`/admin/users`) và *Phân quyền màn hình* (`/admin/permissions`). Màn hình danh sách người dùng trước đây được tách rời và chuyển sang route chuyên trách `/admin/users`.
-    - **Teacher Full-time Dashboard (`/teacher-fulltime/dashboard`)**: Trang tổng quan dành cho Giáo viên cơ hữu, gồm Banner đào tạo, Card *Tổng lượt truy cập* và Card *Trạng thái hệ thống*.
-    - **Teacher Part-time Dashboard (`/teacher-parttime/dashboard`)**: Trang tổng quan dành cho Giáo viên thỉnh giảng, gồm Banner ca dạy, 4 Cards chỉ số (*Tổng số lớp học*, *Tổng số học viên*, *Tổng số bài nộp*, *Tổng lượt truy cập*), và Card *Trạng thái hệ thống*.
+    - **Admin Dashboard (`/admin/dashboard`)**: Trang tổng quan điều hành của Quản trị viên, gồm Banner Ruby-Obsidian, Card *Tổng số tài khoản* (lấy trực tiếp từ Supabase DB) và Card *Tổng lượt truy cập*, kèm phím tắt điều hướng nhanh tới *Quản lý tài khoản* (`/admin/system-management/users`) và *Phân quyền màn hình* (`/admin/system-management/screen_permission`).
+    - **Teacher Full-time Dashboard (`/teacher-fulltime/dashboard`)**: Trang tổng quan dành cho Giáo viên cơ hữu, gồm Banner đào tạo và Card *Tổng lượt truy cập*.
+    - **Teacher Part-time Dashboard (`/teacher-parttime/dashboard`)**: Trang tổng quan dành cho Giáo viên thỉnh giảng, gồm Banner ca dạy và 4 Cards chỉ số (*Tổng số lớp học*, *Tổng số học viên*, *Tổng số bài nộp*, *Tổng lượt truy cập*).
 11. **Quy Tắc Biến Môi Trường (Chỉ Duy Nhất 1 File `.env`)**:
     - Toàn bộ biến môi trường của dự án chỉ được lưu trữ trong **DUY NHẤT một file `.env`**.
     - Tuyệt đối cấm tạo các file biến thể khác (như `.env.example`, `.env.local`, `.env.production`, v.v.).
     - File `.env` được bảo vệ tuyệt đối trong `.gitignore` để không bao giờ bị lộ lên GitHub.
+12. **Quy Chuẩn Định Tuyến Phân Quyền Theo Vai Trò (`/[role]/[main_menu]/[menu]`)**:
+    - Tất cả các tuyến đường có khả năng phân quyền bắt buộc có định dạng: `/[role]/[main_menu]/[menu]`.
+    - Tuyến màn hình phân quyền bắt buộc có tên chứa `screen_permission`: `/[role]/system-management/screen_permission`.
+    - **Chặn Truy Cập Chéo Vai Trò & Chặn Không Có Quyền**: Nếu người dùng thuộc vai trò A cố truy cập route của vai trò B hoặc truy cập menu mà chưa được cấp quyền, Middleware sẽ chặn ngay lập tức và **trả về trực tiếp trang 404 (`not-found`)**.
+13. **Quy Chuẩn Layout Toàn Diện (Header, Footer Có Trạng Thái Hệ Thống & Sidebar Thu Gọn)**:
+    - Mọi giao diện (Dashboard, Quản lý, Phân quyền, Đăng nhập, 404) đều sở hữu Header và Footer thống nhất mang nhận diện thương hiệu *Student MindX Hub (SMH)*.
+    - Huy hiệu "Trạng thái hệ thống hoạt động ổn định 100% • Supabase DB Connected" được đặt cố định ở Footer, loại bỏ card trùng lặp trong nội dung chính của Dashboard.
+    - Sidebar hỗ trợ thu gọn (Collapse) thành dải icon 80px hoặc mở rộng 288px, ghi nhớ trạng thái qua `localStorage`.
+14. **Phân Định Dữ Liệu & Thao Tác Theo Cấp Bậc Vai Trò (Role Hierarchy Scope)**:
+    - Áp dụng triệt để nguyên tắc Role Points: Người dùng chỉ được xem/thao tác các tài khoản và phân quyền cho các vai trò cấp dưới mình (`targetRolePoints > currentUserRolePoints`).
+    - Khóa toàn bộ các thao tác chỉnh sửa, đổi vai trò, đổi trạng thái và xóa đối với chính tài khoản của mình và các vai trò có cấp bậc bằng hoặc cao hơn mình.
+15. **Quy Tắc Quản Lý Cơ Sở Trực Thuộc (Affiliated Centres Rule)**:
+    - **Lưu trữ độc lập trên Supabase**: Bảng `user_centres` lưu trữ danh sách các cơ sở được gán cho từng người dùng, không can thiệp hay thay đổi dữ liệu của LMS MindX.
+    - **Khởi tạo tự động theo loại tài khoản**:
+      - Tài khoản loại LMS (`is_firebase = true`): Tự động truy vấn cơ sở từ LMS và đồng bộ sang Supabase khi tạo tài khoản hoặc đăng nhập.
+      - Tài khoản tự tạo nội bộ (`is_firebase = false`): Ban đầu không có cơ sở trực thuộc (`[]`).
+    - **Phân cấp chỉnh sửa**: Role cao hơn (`currentUserPoints < targetUserPoints`) mới được phép xem và chỉnh sửa cơ sở cho role thấp hơn. Khóa chỉnh sửa đối với chính mình và các tài khoản bằng hoặc cao hơn.
+    - **Danh mục cơ sở chọn thêm**: Luôn lấy từ danh mục chính thống trên hệ thống MindX LMS.
 
+---
 
+## 10. Luồng Quản Lý Cơ Sở Trực Thuộc Của Các Tài Khoản (User Affiliated Centres Flow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Người Dùng Có Quyền (Admin / FT)
+    participant UI as Giao Diện UserCentresManagementScreen
+    participant API as API Server (/api/admin/user-centres)
+    participant LMS as GraphQL LMS MindX
+    participant SB as Supabase DB (users, user_centres)
+
+    Note over Admin,SB: Giai đoạn 1: Khởi tạo tài khoản & Tự động đồng bộ cơ sở ban đầu
+    alt Tạo tài khoản loại LMS (is_firebase = true)
+        Admin->>API: POST /api/admin/users { lms_code, full_name, is_firebase: true }
+        API->>SB: Tạo bản ghi user mới
+        API->>LMS: Tra cứu giáo viên/cơ sở ban đầu trên LMS
+        LMS-->>API: Trả về danh sách cơ sở [{ id, name, shortName }]
+        API->>SB: Lưu cơ sở vào bảng user_centres
+    else Tạo tài khoản tự tạo nội bộ (is_firebase = false)
+        Admin->>API: POST /api/admin/users { lms_code, full_name, is_firebase: false }
+        API->>SB: Tạo bản ghi user mới (danh sách cơ sở ban đầu trống [])
+    end
+
+    Note over Admin,SB: Giai đoạn 2: Xem danh sách & Quản lý cơ sở trực thuộc
+    Admin->>UI: Truy cập /[role]/system-management/user_centres
+    UI->>API: GET /api/admin/user-centres
+    API->>SB: Lấy danh sách users & user_centres
+    API-->>UI: Trả về mảng users kèm centres & can_edit (theo role points)
+    UI->>Admin: Hiển thị bảng dữ liệu với badges cơ sở (hoặc "Chưa gán cơ sở")
+
+    Note over Admin,SB: Giai đoạn 3: Chỉnh sửa / Gán thêm cơ sở cho tài khoản cấp dưới
+    Admin->>UI: Bấm "Sửa cơ sở" trên tài khoản cấp dưới
+    UI->>API: GET /api/admin/centres (Danh mục 20 cơ sở LMS chính thống)
+    API-->>UI: Trả về danh mục cơ sở chính thống
+    UI->>Admin: Mở Modal chọn cơ sở (Multi-select)
+    Admin->>UI: Tích chọn thêm cơ sở -> Bấm "Lưu thay đổi"
+    UI->>API: PUT /api/admin/user-centres/[id] { centres: [...] }
+    API->>API: Kiểm tra role: currentRolePoints < targetRolePoints
+    alt Không đủ quyền (sửa chính mình hoặc role cao hơn/bằng mình)
+        API-->>UI: 403 Forbidden
+        UI->>Admin: Báo lỗi không có quyền
+    else Hợp lệ
+        API->>SB: Lưu/Cập nhật bảng user_centres (chỉ lưu Supabase, không sửa LMS)
+        API-->>UI: 200 OK Thành công
+        UI->>Admin: Toast thông báo thành công & cập nhật bảng dữ liệu tức thì
+    end
+```
+
+---
+
+## 11. Luồng Quản Lý & Hiển Thị Lịch Trải Nghiệm (Trial / Office Hours Flow)
+
+### 11.1 Nguyên Tắc Nghiệp Vụ & Quy Chuẩn Kiến Trúc
+1. **Menu Chính**: `Kiểm tra dữ liệu` (`data_inspection`).
+2. **Menu Phụ**: `Lịch trải nghiệm` (`trial_schedules`).
+3. **Quy Chuẩn Định Tuyến**: `/[role]/data-inspection/trial_schedules`.
+4. **Bắt Buộc Kế Thừa AppLayout Toàn Diện**:
+   - Giao diện lịch trải nghiệm bắt buộc được bọc trong `<AppLayout pageTitle="Lịch Trải Nghiệm (Office Hours)">`.
+   - Có đầy đủ Sidebar điều hướng bên trái, Header thông tin người dùng / theme toggle / dropdown hồ sơ và Footer tình trạng hệ thống ở cuối trang.
+5. **Cơ Chế Lọc Theo Cơ Sở Trực Thuộc**:
+   - Dữ liệu truy vấn hoàn toàn phụ thuộc vào danh sách cơ sở trực thuộc của chính tài khoản đang đăng nhập được lưu trong bảng `user_centres` (kèm cơ chế lưu trữ bền vững `data/user_centres_store.json`).
+   - Hệ thống tự động trích xuất `user_id` từ session cookie, truy vấn danh sách `centre_id`, và truyền vào `centreIn` của GraphQL query LMS MindX.
+   - **Tuyệt đối không có bất kỳ bộ lọc chọn tài khoản hay role nào trên giao diện**, đảm bảo tính bảo mật và đúng phạm vi phụ trách của từng người dùng.
+6. **Truy Vấn GraphQL Chuẩn & Lọc Thô Triệt Để**:
+   - Tên Query: `GetApprovedOfficeHours($payload: OfficeHourQuery)`.
+   - Tham số: `paginationType: "OFFSET"`, `pageIndex: 0`, `itemsPerPage: 500`, `statusIn: ["APPROVED"]`, `timeFrom`, `timeTo`.
+   - Lọc thô (Cleaning Rules): Tự động loại bỏ 100% các ca có trường `type` liên quan đến dạy bù: `MAKEUP`, `MAKE_UP`, `BÙ`, `BU` (loại bỏ dấu tiếng Việt, không phân biệt hoa thường).
+   - Dữ liệu schema mở rộng: `courses`, `courseLines`, `studentCount`, `managerNote`, `note`, `teacher`, `centre`, `appointments`.
+7. **Chuẩn Hóa Dữ Liệu 3 Cấp**:
+   - **Cơ sở (Campus)**: Chuẩn hóa theo tên cơ sở trực thuộc của user:
+     * `tên lửa` / `ten lua` $\rightarrow$ **`TÊN LỬA`**
+     * `lũy bán bích` / `luy ban bich` $\rightarrow$ **`LŨY BÁN BÍCH`**
+     * `tây thạnh` / `tay thanh` $\rightarrow$ **`TÂY THẠNH`**
+     * `trường chinh` / `truong chinh` $\rightarrow$ **`TRƯỜNG CHINH`**
+     * Cơ sở khác: Viết hoa theo tên cơ sở.
+   - **Khối môn (Khoi)**: Dựa vào `courseLines` và `courses`:
+     * Có `XART`, `ART`, `DRAW`, `VISUAL` $\rightarrow$ **`ART`** (Màu Xanh Navy `#1E3A8A`)
+     * Có `ROB`, `ROBOT`, `ROBOTICS` $\rightarrow$ **`ROBOTICS`** (Màu Xanh Lá `#15803D`)
+     * Còn lại $\rightarrow$ **`CODING`** (Màu Đỏ Ruby `#E11D48`)
+     * **Thứ tự ưu tiên hiển thị chuẩn mockup**: `CODING` $\rightarrow$ `ART` $\rightarrow$ `ROBOTICS`.
+   - **Ca học (Shift - UTC+7)**:
+     * Giờ $\le$ 12:00 $\rightarrow$ **`SÁNG`** (09:00 - 12:00 hoặc thời gian thực tế).
+     * 12:01 $\le$ Giờ < 17:00 $\rightarrow$ **`CHIỀU`** (14:00 - 17:00 hoặc thời gian thực tế).
+     * Giờ $\ge$ 17:01 $\rightarrow$ **`TỐI`** (18:00 - 21:00 hoặc thời gian thực tế).
+     * Trong mỗi ô ca: Sắp xếp tăng dần theo `startTime`.
+8. **Bố Cục Bảng Ma Trận Duy Nhất (Single Matrix View)**:
+   - Cấu trúc bảng ma trận gồm 7 cột chuẩn theo đúng thứ tự:
+     `[Cơ sở]` (gộp dòng toàn cơ sở) | `[Khối]` (gộp dòng theo khối) | `[Ca]` | `[Khung giờ]` | `[Mentor]` (kèm nhãn Xác nhận / Cần xác nhận) | `[Số lượng]` | `[Note]`.
+   - **1 case = 1 dòng duy nhất**: Chỉ hiển thị thông tin Mentor và Số lượng học viên của case đó, không tách chi tiết từng dòng ứng viên/học sinh.
+   - **Tiêu đề bảng tinh gọn & Triệt tiêu thanh cuộn**: Tiêu đề bảng chỉ hiển thị `LỊCH TRẢI NGHIỆM ([Tên cơ sở]) • [Ngày]`, tuyệt đối không có chữ "LMS MindX Hub" hay "Ultra HD 3x". Toàn bộ thanh cuộn ngang/dọc được ẩn triệt để (`no-scrollbar`).
+   - **Định dạng chữ to, rõ ràng và tương phản cao (High-Legibility Standard)**: Cỡ chữ trong bảng và khi kết xuất ảnh sao chép (cả 1 cơ sở và toàn bộ cơ sở) phải to, rõ nét (`text-base`, `text-lg`, `font-black`), tương phản cao để khi xem ảnh thu nhỏ trên Zalo (điện thoại/máy tính) vẫn đọc rõ thông tin không bị mờ hay nhỏ.
+   - Màu sắc phân biệt trực quan:
+     * Khối CODING: Đỏ Ruby (`#E11D48`).
+     * Khối ART: Xanh Navy (`#1E3A8A`).
+     * Khối ROBOTICS: Xanh Lá (`#15803D`).
+     * Hàng có Mentor xác nhận: Nền xanh nhạt `#DCEBFC`.
+     * Hàng cần xác nhận Mentor: Nền đỏ hồng nhạt `#FFE2E5`.
+9. **Tính Năng Sao Chép Ảnh Lịch Theo Từng Cơ Sở & Toàn Bộ Cơ Sở Gửi Nhanh Zalo**:
+   - Dưới mỗi tên cơ sở có nút **"Sao chép ảnh"** (kèm icon `Copy`).
+   - **Ràng buộc quan trọng**: Chỉ hiển thị nút sao chép ảnh đối với các cơ sở có ca trải nghiệm (`hasCases === true`). Cơ sở không có ca học thì không có nút này. Nút sao chép toàn bộ cơ sở được đặt trên thanh công cụ trên cùng.
+   - Kết xuất ảnh không chứa bất kỳ thanh cuộn nào.
+   - Nút "Sao chép ảnh" có class `hide-on-export` nên sẽ tự động ẩn đi trong ảnh thành phẩm.
+   - Ghi trực tiếp định dạng ảnh PNG vào Clipboard của hệ điều hành thông qua API `navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])`.
+   - Người dùng chỉ cần mở nhóm Zalo và nhấn **Ctrl + V** để dán ảnh lịch cơ sở cực nét ngay tức thì.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Người Dùng (Admin / Giáo Viên)
+    participant UI as Màn Hình Lịch Trải Nghiệm (TrialSchedulesScreen)
+    participant API as API Server (/api/office-hours)
+    participant SB as Supabase DB & Store (user_centres)
+    participant LMS as MindX LMS GraphQL (GetApprovedOfficeHours)
+    participant Clip as Clipboard Hệ Điều Hành
+
+    User->>UI: Truy cập /[role]/data-inspection/trial_schedules
+    Note over UI: Kế thừa AppLayout (Sidebar, Header, Footer) & Mặc định chọn ngày mai
+    UI->>API: GET /api/office-hours?date=YYYY-MM-DD
+    API->>SB: Lấy danh sách cơ sở trực thuộc của userId đang đăng nhập
+    SB-->>API: Danh sách 4 cơ sở (TÊN LỬA, TÂY THẠNH, LŨY BÁN BÍCH, TRƯỜNG CHINH)
+    API->>LMS: query GetApprovedOfficeHours { centreIn: [...ids], timeFrom, timeTo, statusIn: ["APPROVED"] }
+    LMS-->>API: Trả về danh sách ca trải nghiệm thô
+    API->>API: Lọc thô loại bỏ 100% ca chứa Makeup / Bù
+    API-->>UI: Trả về { success: true, date, userCentres, officeHours }
+    UI->>UI: Phân loại: Cơ sở -> Khối (CODING -> ART -> ROBOTICS) -> Ca (SÁNG -> CHIỀU -> TỐI)
+    UI->>User: Hiển thị bảng ma trận từng cơ sở với cột "Số lượng học viên" (1 case = 1 dòng)
+    
+    opt Sao chép ảnh cơ sở có case gửi Zalo
+        User->>UI: Bấm "Sao chép ảnh" dưới tên cơ sở có ca trải nghiệm
+        UI->>Clip: Kết xuất ảnh cơ sở bằng html-to-image (pixelRatio: 3, ẩn nút chép) & ghi ClipboardItem
+        UI->>User: Toast "Đã sao chép ảnh lịch cơ sở! Hãy mở Zalo và nhấn Ctrl+V để gửi ngay"
+    end
+```
 

@@ -1,0 +1,106 @@
+{
+  "22425883-2d90-4c0a-8f6c-107d337d1d0e": [
+    {
+      "id": "62918d02af37d11e2da237e5",
+      "name": "HCM - Khu Tên Lửa",
+      "shortName": "174TL",
+      "code": "TL"
+    },
+    {
+      "id": "63034f4a7d1d1e1cb14e4e57",
+      "name": "HCM - 322 Tây Thạnh",
+      "shortName": "322TT",
+      "code": "TT"
+    },
+    {
+      "id": "62cc07753c1309654f472e60",
+      "name": "HCM - 414 Lũy Bán Bích",
+      "shortName": "414LBB",
+      "code": "LBB"
+    },
+    {
+      "id": "62d6dcc16e356729147d73a6",
+      "name": "HCM - 01 Trường Chinh",
+      "shortName": "01TC",
+      "code": "TC"
+    }
+  ],
+  "anhhn01": [
+    {
+      "id": "62918d02af37d11e2da237e5",
+      "name": "HCM - Khu Tên Lửa",
+      "shortName": "174TL",
+      "code": "TL"
+    },
+    {
+      "id": "63034f4a7d1d1e1cb14e4e57",
+      "name": "HCM - 322 Tây Thạnh",
+      "shortName": "322TT",
+      "code": "TT"
+    },
+    {
+      "id": "62cc07753c1309654f472e60",
+      "name": "HCM - 414 Lũy Bán Bích",
+      "shortName": "414LBB",
+      "code": "LBB"
+    },
+    {
+      "id": "62d6dcc16e356729147d73a6",
+      "name": "HCM - 01 Trường Chinh",
+      "shortName": "01TC",
+      "code": "TC"
+    }
+  ],
+  "b5edaae0-7e2a-4ad8-829c-234587d06e06": [
+    {
+      "id": "62918d02af37d11e2da237e5",
+      "name": "HCM - Khu Tên Lửa",
+      "shortName": "174TL",
+      "code": "TL"
+    },
+    {
+      "id": "63034f4a7d1d1e1cb14e4e57",
+      "name": "HCM - 322 Tây Thạnh",
+      "shortName": "322TT",
+      "code": "TT"
+    },
+    {
+      "id": "62cc07753c1309654f472e60",
+      "name": "HCM - 414 Lũy Bán Bích",
+      "shortName": "414LBB",
+      "code": "LBB"
+    },
+    {
+      "id": "62d6dcc16e356729147d73a6",
+      "name": "HCM - 01 Trường Chinh",
+      "shortName": "01TC",
+      "code": "TC"
+    }
+  ],
+  "huynhnhatanh": [
+    {
+      "id": "62918d02af37d11e2da237e5",
+      "name": "HCM - Khu Tên Lửa",
+      "shortName": "174TL",
+      "code": "TL"
+    },
+    {
+      "id": "63034f4a7d1d1e1cb14e4e57",
+      "name": "HCM - 322 Tây Thạnh",
+      "shortName": "322TT",
+      "code": "TT"
+    },
+    {
+      "id": "62cc07753c1309654f472e60",
+      "name": "HCM - 414 Lũy Bán Bích",
+      "shortName": "414LBB",
+      "code": "LBB"
+    },
+    {
+      "id": "62d6dcc16e356729147d73a6",
+      "name": "HCM - 01 Trường Chinh",
+      "shortName": "01TC",
+      "code": "TC"
+    }
+  ]
+}

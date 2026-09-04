@@ -6,12 +6,10 @@ import AppLayout from "@/components/layout/AppLayout";
 import {
   Users,
   Activity,
-  CheckCircle2,
   ShieldCheck,
   ArrowUpRight,
   RefreshCw,
   KeyRound,
-  Sparkles,
 } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 
@@ -64,7 +62,7 @@ export default function AdminDashboardPage() {
           <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-black/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="relative z-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-semibold mb-4 text-white">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-semibold mb-4 text-white whitespace-nowrap">
               <ShieldCheck className="w-4 h-4 text-rose-200" />
               <span>Quản Trị Viên (Admin)</span>
             </div>
@@ -119,33 +117,18 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* TRẠNG THÁI HỆ THỐNG */}
-        <div className="bg-white dark:bg-[#0B0F17] rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800/80 shadow-sm space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h4 className="text-base font-bold text-slate-900 dark:text-white">
-              Trạng Thái Hệ Thống
-            </h4>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-            Hệ thống quản trị SMH đang được tối ưu hóa cho Quản trị viên. Toàn bộ cơ sở dữ liệu Supabase, phân quyền màn hình theo vai trò (RBAC) và cơ chế bảo mật Single Admin đang hoạt động ở trạng thái ổn định và sẵn sàng.
-          </p>
-        </div>
-
-        {/* PHÍM TẮT HÀNH ĐỘNG NHANH */}
+        {/* PHÍM TẮT HÀNH ĐỘNG NHANH (Dẫn đến route chuẩn /[role]/[main_menu]/[menu]) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link
             href={API_ROUTES.ADMIN.USERS_SCREEN}
             className="p-5 rounded-2xl bg-white dark:bg-[#0B0F17] border border-slate-200 dark:border-slate-800 hover:border-rose-500/40 transition-all flex items-center justify-between group shadow-sm"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors whitespace-nowrap">
                   Quản lý tài khoản
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -153,7 +136,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-rose-500 transition-colors" />
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-rose-500 transition-colors shrink-0" />
           </Link>
 
           <Link
@@ -161,19 +144,19 @@ export default function AdminDashboardPage() {
             className="p-5 rounded-2xl bg-white dark:bg-[#0B0F17] border border-slate-200 dark:border-slate-800 hover:border-rose-500/40 transition-all flex items-center justify-between group shadow-sm"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50 flex items-center justify-center shrink-0">
                 <KeyRound className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors whitespace-nowrap">
                   Phân quyền màn hình
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Cấu hình hiển thị menu cho các vai trò cấp dưới
+                  Cấu hình ma trận phân quyền màn hình cho các vai trò
                 </p>
               </div>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-rose-500 transition-colors" />
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-rose-500 transition-colors shrink-0" />
           </Link>
         </div>
       </div>

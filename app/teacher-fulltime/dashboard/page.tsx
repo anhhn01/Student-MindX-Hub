@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Activity, CheckCircle2, Award, RefreshCw } from "lucide-react";
+import { Activity, Award, RefreshCw } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 
 export default function TeacherFullTimeDashboardPage() {
@@ -47,7 +47,7 @@ export default function TeacherFullTimeDashboardPage() {
           </div>
         </div>
 
-        {/* Stats Grid - Card Tổng lượt truy cập (Theo yêu cầu của người dùng) */}
+        {/* Stats Grid - Card Tổng lượt truy cập */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <div className="bg-white dark:bg-[#0B0F17] p-6 rounded-3xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center gap-4 hover:border-teal-500/30 transition-all">
             <div className="p-3.5 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 shrink-0">
@@ -66,21 +66,6 @@ export default function TeacherFullTimeDashboardPage() {
               </h3>
             </div>
           </div>
-        </div>
-
-        {/* Feature Notice Card */}
-        <div className="bg-white dark:bg-[#0B0F17] rounded-3xl border border-slate-200 dark:border-slate-800/80 p-7 shadow-sm space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white whitespace-nowrap">
-              Trạng Thái Hệ Thống
-            </h3>
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-            Hệ thống đào tạo SMH đang được tối ưu hóa cho các giáo viên cơ hữu. Các mô-đun sổ điểm, điểm danh và phản hồi học viên sẽ tự động kích hoạt theo cấu hình phân quyền từ Quản trị viên.
-          </p>
         </div>
       </div>
     </AppLayout>

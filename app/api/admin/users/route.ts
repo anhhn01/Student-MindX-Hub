@@ -220,6 +220,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
+    // 6. Đồng bộ cơ sở trực thuộc:
+    // - Mặc định tài khoản loại LMS (isLmsType): tự động tra cứu cơ sở từ LMS và lưu vào Supabase
+    // - Tài khoản tự tạo nội bộ (!isLmsType): ban đầu cơ sở trực thuộc trống ([])
+    if (isLmsType) {
+      const { syncLmsCentresForUser } = await import("@/lib/services/user-centres-service");
+      syncLmsCentresForUser(newUser.id, cleanLmsCode, full_name.trim()).catch((err) => {
+        console.warn("Lỗi đồng bộ cơ sở ban đầu cho tài khoản LMS:", err);
+      });
+    }
+
     // Return joined user text representations
     const returnedUser = {
       id: newUser.id,

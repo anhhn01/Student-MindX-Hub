@@ -7,7 +7,6 @@ import {
   Users,
   ClipboardCheck,
   Activity,
-  CheckCircle2,
   Sparkles,
   RefreshCw,
 } from "lucide-react";
@@ -72,7 +71,7 @@ export default function TeacherPartTimeDashboardPage() {
           </div>
         </div>
 
-        {/* 4 STATS CARDS THEO YÊU CẦU: Tổng lớp, Tổng học viên, Tổng bài nộp, Tổng lượt truy cập */}
+        {/* 4 STATS CARDS THEO YÊU CẦU */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {/* 1. Tổng số lớp học */}
           <div className="bg-white dark:bg-[#0B0F17] p-6 rounded-3xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center gap-4 hover:border-rose-500/30 transition-all">
@@ -149,21 +148,6 @@ export default function TeacherPartTimeDashboardPage() {
               </h3>
             </div>
           </div>
-        </div>
-
-        {/* Trạng thái hệ thống */}
-        <div className="bg-white dark:bg-[#0B0F17] rounded-3xl border border-slate-200 dark:border-slate-800/80 p-7 shadow-sm space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white whitespace-nowrap">
-              Trạng Thái Hệ Thống
-            </h3>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-            Hệ thống SMH cho giáo viên thỉnh giảng đang sẵn sàng. Thông tin ca dạy, sĩ số lớp và bài nộp của học viên sẽ tự động đồng bộ theo tiến độ giảng dạy MindX.
-          </p>
         </div>
       </div>
     </AppLayout>
