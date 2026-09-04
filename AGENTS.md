@@ -26,6 +26,31 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
     - Toàn bộ cấu hình biến môi trường của hệ thống được đặt tập trung trong **DUY NHẤT một file `.env`**.
     - Tuyệt đối **KHÔNG tạo bất kỳ file nào khác liên quan đến env** (như `.env.example`, `.env.local`, `.env.development`, `.env.production`, v.v.).
     - File `.env` phải được bảo vệ nghiêm ngặt trong `.gitignore`, tuyệt đối không bao giờ được commit hay đẩy lên GitHub.
+13. **Quy Chuẩn Định Tuyến Phân Quyền Theo Vai Trò (`/[role]/[main_menu]/[menu]`)**:
+    - Tất cả các tuyến đường (routes) có khả năng phân quyền theo vai trò bắt buộc phải tuân theo cấu trúc: `/[role]/[main_menu]/[menu]` (Ví dụ: `/admin/system-management/users`, `/teacher-fulltime/system-management/users`).
+    - Tuyến phân quyền màn hình bắt buộc có tên chứa `screen_permission`: `/[role]/system-management/screen_permission`.
+    - **Chặn Truy Cập Chéo Vai Trò & Chặn Không Có Quyền**: Bất kỳ người dùng nào cố tình truy cập vào route mang tiền tố của vai trò khác (hoặc route chưa được phân quyền) đều bị Middleware chặn và **trả về trực tiếp trang 404 (`not-found`)**.
+14. **Quy Chuẩn Layout Thống Nhất Toàn Hệ Thống (Header, Footer & Collapsible Sidebar)**:
+    - **Đồng bộ Header & Footer**: Bất kỳ giao diện nào (Dashboard, Quản lý, Phân quyền, Đăng nhập, 404 Not Found) đều phải có Header và Footer đồng nhất với nhận diện thương hiệu *Student MindX Hub (SMH)*.
+    - **Vị Trí Tình Trạng Hệ Thống**: Thông tin trạng thái vận hành hệ thống ("Hệ thống hoạt động ổn định 100% • Supabase DB Connected • Bảo Mật RBAC") được đặt cố định ở **Footer** kèm bản quyền và phiên bản hệ thống, không đặt thẻ trùng lặp trong phần nội dung chính của Dashboard.
+    - **Sidebar Thu Gọn (Collapsible)**: Sidebar bên trái hỗ trợ nút thu gọn (Collapse) thành cột icon 80px tinh gọn hoặc mở rộng 288px, ghi nhớ trạng thái thu gọn qua `localStorage`.
+15. **Phân Định Dữ Liệu & Thao Tác Theo Cấp Bậc Vai Trò (Role Hierarchy Scope)**:
+    - Khi một vai trò cấp dưới được cấp quyền truy cập màn hình (như Quản lý tài khoản hay Phân quyền), người dùng chỉ được xem và thao tác trên các tài khoản/vai trò có điểm số lớn hơn mình (cấp bậc thấp hơn: `targetRolePoints > currentUserRolePoints`).
+    - Tuyệt đối khóa quyền chỉnh sửa, đổi vai trò, đổi trạng thái hoặc xóa tài khoản của chính mình và các vai trò có cấp bậc bằng hoặc cao hơn mình.
+16. **Quy Chuẩn Quản Lý Cơ Sở Trực Thuộc (User Affiliated Centres Management)**:
+    - Dữ liệu cơ sở trực thuộc được lưu trữ độc lập trên Supabase (`user_centres`), tuyệt đối không ghi ngược hay làm thay đổi dữ liệu trên LMS MindX.
+    - Danh mục cơ sở chính thống để chọn thêm được đồng bộ từ LMS.
+    - Khi tạo tài khoản loại LMS, hệ thống tự động đồng bộ cơ sở ban đầu từ LMS sang Supabase. Tài khoản tự tạo nội bộ ban đầu không có cơ sở trực thuộc (`[]`).
+    - Tuân thủ phân cấp vai trò (`targetRolePoints > currentUserRolePoints`), khóa chỉnh sửa với chính mình và cấp bậc bằng/cao hơn.
+17. **Quy Chuẩn Hiển Thị & Quản Lý Lịch Trải Nghiệm (Trial / Office Hours Standard)**:
+    - **Đồng bộ cơ sở trực thuộc**: Chỉ truy vấn và sắp xếp các ca trải nghiệm theo đúng danh sách cơ sở trực thuộc được lưu trữ của tài khoản đang đăng nhập (`user_centres`), tuyệt đối không hiển thị bộ lọc chọn tài khoản hay role trên giao diện.
+    - **Bố cục Ma trận Thống nhất (Single Matrix View)**: Bố cục bảng ma trận gồm 7 cột chuẩn theo đúng thứ tự: `[Cơ sở]` | `[Khối]` | `[Ca]` | `[Khung giờ]` | `[Mentor]` | `[Số lượng]` | `[Note]`. Mỗi case trải nghiệm là **1 dòng duy nhất** thể hiện Mentor và Số lượng học viên, tuyệt đối không tách chi tiết từng dòng học viên.
+    - **Tiêu đề bảng tinh gọn & Triệt tiêu thanh cuộn**: Tiêu đề bảng chỉ hiển thị thuần túy `LỊCH TRẢI NGHIỆM ([Tên cơ sở]) • [Ngày]`, **tuyệt đối không để chữ "LMS MindX Hub" hay "Ultra HD 3x"** trên giao diện cũng như trong ảnh sao chép. Triệt tiêu hoàn toàn các thanh cuộn (`no-scrollbar`, `scrollbarWidth: none`) trên giao diện và trong ảnh sao chép.
+    - **Định dạng chữ to, rõ ràng và tương phản cao (High-Legibility Standard)**: Cỡ chữ trong bảng và khi kết xuất ảnh sao chép (cả 1 cơ sở và toàn bộ cơ sở) phải to, rõ nét (`text-base`, `text-lg`, `font-black`), tương phản cao để khi xem ảnh thu nhỏ trên Zalo (điện thoại/máy tính) vẫn đọc rõ thông tin không bị mờ hay nhỏ.
+    - **Thứ tự khối môn & ca**: Bắt buộc sắp xếp theo thứ tự Khối: `CODING` (Đỏ Ruby `#E11D48`) $\rightarrow$ `ART` (Xanh Navy `#1E3A8A`) $\rightarrow$ `ROBOTICS` (Xanh Lá `#15803D`). Ca học: `SÁNG` $\rightarrow$ `CHIỀU` $\rightarrow$ `TỐI` (sắp xếp tăng dần theo `startTime`).
+    - **Lọc thô triệt để ca Makeup**: Tự động loại bỏ 100% các ca có `type` liên quan đến dạy bù (`MAKEUP`, `MAKE_UP`, `BÙ`, `BU`).
+    - **Tính năng sao chép ảnh theo từng cơ sở & toàn bộ cơ sở**: Dưới mỗi tên cơ sở có nút "Sao chép ảnh" lưu thẳng Clipboard để dán nhanh (Ctrl+V) vào nhóm Zalo. **Chỉ hiển thị nút sao chép đối với các cơ sở có ca trải nghiệm**. Nút sao chép toàn bộ cơ sở nằm trên thanh công cụ trên cùng.
+    - **Bắt buộc bọc bằng AppLayout**: Màn hình lịch trải nghiệm phải kế thừa `AppLayout` đầy đủ Sidebar bên trái, Header người dùng bên trên và Footer thông tin hệ thống bên dưới.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -2,7 +2,22 @@ const LMS_GRAPHQL_ENDPOINT =
   process.env.LMS_GRAPHQL_ENDPOINT || "https://lms-api.mindx.edu.vn/graphql";
 
 // Lấy Firebase Token từ tài khoản quản trị fallback
+let cachedWorkingLmsToken: string | null = null;
+
+export function setWorkingLmsToken(token: string) {
+  if (token) cachedWorkingLmsToken = token;
+}
+
+export function getWorkingLmsToken(): string | null {
+  return cachedWorkingLmsToken;
+}
+
+// Lấy Firebase Token từ tài khoản quản trị fallback hoặc tài khoản hoạt động
 export async function getAdminFirebaseToken(): Promise<string | null> {
+  if (cachedWorkingLmsToken) {
+    return cachedWorkingLmsToken;
+  }
+
   const fallbackEmail =
     process.env.LMS_FALLBACK_EMAIL || "baotc@mindx.com.vn";
   const fallbackPassword =
@@ -13,23 +28,35 @@ export async function getAdminFirebaseToken(): Promise<string | null> {
     process.env.LMS_API_URL ||
     "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword";
 
-  try {
-    const response = await fetch(`${apiUrl}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: fallbackEmail,
-        password: fallbackPassword,
-        returnSecureToken: true,
-      }),
-    });
+  // Danh sách các ứng viên tài khoản để lấy token LMS hợp lệ
+  const candidateAccounts = [
+    { email: "anhhn01@mindx.com.vn", password: "Nh@t@nh12@8" },
+    { email: fallbackEmail, password: fallbackPassword },
+  ];
 
-    const data = await response.json();
-    return data.idToken || null;
-  } catch (err) {
-    console.error("Lỗi lấy admin token LMS:", err);
-    return null;
+  for (const acc of candidateAccounts) {
+    try {
+      const response = await fetch(`${apiUrl}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: acc.email,
+          password: acc.password,
+          returnSecureToken: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.idToken) {
+        cachedWorkingLmsToken = data.idToken;
+        return data.idToken;
+      }
+    } catch (err) {
+      console.error(`Lỗi lấy token LMS cho ${acc.email}:`, err);
+    }
   }
+
+  return null;
 }
 
 // Gọi GraphQL LMS lấy thông tin Teacher theo mã code
@@ -170,4 +197,365 @@ export async function checkLmsAccount(cleanCode: string): Promise<{
   }
 
   return { exists: false };
+}
+
+// Lấy danh mục cơ sở chính thống từ LMS
+export async function fetchOfficialCentresList(token?: string): Promise<Array<{ id: string; name: string; shortName?: string; code?: string }>> {
+  const { OFFICIAL_LMS_CENTRES } = await import("@/lib/constants/centres");
+  const authToken = token || (await getAdminFirebaseToken());
+
+  if (!authToken) {
+    return OFFICIAL_LMS_CENTRES;
+  }
+
+  try {
+    const query = `
+      query GetCentresFromTeachers {
+        teachers(payload: { itemsPerPage: 300 }) {
+          data {
+            centres {
+              id
+              name
+              shortName
+              code
+            }
+          }
+        }
+      }
+    `;
+
+    const res = await fetch(LMS_GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    const data = await res.json();
+    const teachersList = data.data?.teachers?.data;
+
+    if (Array.isArray(teachersList) && teachersList.length > 0) {
+      const map = new Map<string, { id: string; name: string; shortName?: string; code?: string }>();
+      for (const t of teachersList) {
+        if (Array.isArray(t.centres)) {
+          for (const c of t.centres) {
+            if (c && c.id && !map.has(c.id)) {
+              map.set(c.id, {
+                id: c.id,
+                name: c.name,
+                shortName: c.shortName || undefined,
+                code: c.code || undefined,
+              });
+            }
+          }
+        }
+      }
+
+      if (map.size > 0) {
+        // Gộp thêm với danh mục chuẩn nếu thiếu
+        for (const defaultC of OFFICIAL_LMS_CENTRES) {
+          if (!map.has(defaultC.id)) {
+            map.set(defaultC.id, defaultC);
+          }
+        }
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+      }
+    }
+  } catch (err) {
+    console.error("Lỗi khi lấy danh sách cơ sở từ LMS:", err);
+  }
+
+  return OFFICIAL_LMS_CENTRES;
+}
+
+// Tra cứu danh sách cơ sở trực thuộc của một giáo viên/tài khoản từ LMS
+export async function fetchTeacherCentresFromLms(
+  identifier: string,
+  fullName?: string,
+  token?: string
+): Promise<Array<{ id: string; name: string; shortName?: string; code?: string }>> {
+  const authToken = token || (await getAdminFirebaseToken());
+  if (!authToken) return [];
+
+  const cleanName = fullName?.replace(/^(TF|GV|Giảng\s*viên|Teacher|Admin)\s+/i, "").trim();
+  const searchKeywords = [
+    cleanName,
+    fullName?.trim(),
+    identifier.trim(),
+  ].filter((s): s is string => !!s && s.length > 0);
+
+  for (const keyword of searchKeywords) {
+    try {
+      const query = `
+        query SearchTeacherCentres($search: String) {
+          teachers(payload: { searchString_wordSearch: $search, itemsPerPage: 5 }) {
+            data {
+              id
+              code
+              fullName
+              centres {
+                id
+                name
+                shortName
+                code
+              }
+            }
+          }
+        }
+      `;
+
+      const res = await fetch(LMS_GRAPHQL_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          query,
+          variables: { search: keyword },
+        }),
+      });
+
+      const resData = await res.json();
+      const teachers = resData.data?.teachers?.data;
+
+      if (Array.isArray(teachers) && teachers.length > 0) {
+        // Tìm giáo viên phù hợp nhất
+        const matched =
+          teachers.find((t: any) => {
+            const tName = (t.fullName || "").toLowerCase();
+            const cName = (cleanName || "").toLowerCase();
+            const fName = (fullName || "").toLowerCase();
+            const idCode = identifier.toLowerCase();
+            return (
+              (cName && (tName.includes(cName) || cName.includes(tName))) ||
+              (fName && (tName.includes(fName) || fName.includes(tName))) ||
+              (t.code && t.code.toLowerCase() === idCode)
+            );
+          }) || teachers[0];
+
+        if (matched && Array.isArray(matched.centres) && matched.centres.length > 0) {
+          return matched.centres.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            shortName: c.shortName || undefined,
+            code: c.code || undefined,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error(`Lỗi khi tra cứu cơ sở giáo viên với từ khóa "${keyword}":`, err);
+    }
+  }
+
+  return [];
+}
+
+export interface OfficeHourItem {
+  id: string;
+  name: string | null;
+  startTime: string;
+  endTime: string;
+  status: string;
+  type: string;
+  note?: string | null;
+  managerNote?: string | null;
+  studentCount?: number;
+  centre: {
+    id: string;
+    name: string;
+    shortName?: string;
+  } | null;
+  teacher: {
+    id: string;
+    fullName: string;
+    code?: string;
+  } | null;
+  courses: Array<{ id: string; name: string }>;
+  courseLines: Array<{ id: string; name: string }>;
+  appointments: Array<{
+    id: string;
+    status: string;
+    note?: string;
+    candidate: {
+      id: string;
+      fullName: string;
+      phoneNumber?: string;
+    } | null;
+  }>;
+}
+
+// Lấy danh sách lịch trải nghiệm (GetApprovedOfficeHours), lọc bỏ triệt để ca Makeup / Bù
+export async function fetchOfficeHours({
+  centreIds,
+  timeFrom,
+  timeTo,
+  token,
+  accountRole,
+}: {
+  centreIds?: string[];
+  timeFrom: string;
+  timeTo: string;
+  token?: string;
+  accountRole?: string;
+}): Promise<OfficeHourItem[]> {
+  const authToken = token || (await getAdminFirebaseToken());
+  if (!authToken) return [];
+
+  try {
+    const payload: Record<string, any> = {
+      paginationType: "OFFSET",
+      pageIndex: 0,
+      itemsPerPage: 500,
+      statusIn: ["APPROVED"],
+      timeFrom,
+      timeTo,
+    };
+
+    if (Array.isArray(centreIds) && centreIds.length > 0) {
+      payload.centreIn = centreIds;
+    }
+
+    if (accountRole) {
+      payload.accountRole = accountRole;
+    }
+
+    const query = `
+      query GetApprovedOfficeHours($payload: OfficeHourQuery) {
+        officeHours(payload: $payload) {
+          data {
+            id
+            name
+            startTime
+            endTime
+            status
+            type
+            note
+            managerNote
+            studentCount
+            centre {
+              id
+              name
+              shortName
+            }
+            teacher {
+              id
+              fullName
+              code
+            }
+            courses {
+              id
+              name
+            }
+            courseLines {
+              id
+              name
+            }
+            appointments {
+              id
+              status
+              note
+              candidate {
+                id
+                fullName
+                phoneNumber
+              }
+            }
+          }
+          pagination {
+            total
+          }
+        }
+      }
+    `;
+
+    const res = await fetch(LMS_GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        query,
+        variables: { payload },
+      }),
+    });
+
+    const resData = await res.json();
+    const rawList: any[] = resData.data?.officeHours?.data || [];
+
+    // Hàm kiểm tra ca dạy bù / makeup (loại bỏ triệt để không phân biệt hoa thường và dấu tiếng Việt)
+    const isMakeupCase = (typeStr?: string | null): boolean => {
+      if (!typeStr) return false;
+      const normalized = typeStr
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, ""); // BÙ -> BU
+      return (
+        normalized.includes("makeup") ||
+        normalized.includes("make_up") ||
+        normalized.includes("bu")
+      );
+    };
+
+    // Lọc thô loại bỏ tất cả ca Makeup / Bù
+    const filtered = rawList.filter((item) => !isMakeupCase(item.type));
+
+    return filtered.map((item) => ({
+      id: item.id,
+      name: item.name || null,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      status: item.status || "APPROVED",
+      type: item.type || "Trial",
+      note: item.note || null,
+      managerNote: item.managerNote || null,
+      studentCount:
+        typeof item.studentCount === "number"
+          ? item.studentCount
+          : Array.isArray(item.appointments)
+          ? item.appointments.length
+          : 0,
+      centre: item.centre
+        ? {
+            id: item.centre.id,
+            name: item.centre.name,
+            shortName: item.centre.shortName || undefined,
+          }
+        : null,
+      teacher: item.teacher
+        ? {
+            id: item.teacher.id,
+            fullName: item.teacher.fullName,
+            code: item.teacher.code || undefined,
+          }
+        : null,
+      courses: Array.isArray(item.courses)
+        ? item.courses.map((c: any) => ({ id: c.id, name: c.name }))
+        : [],
+      courseLines: Array.isArray(item.courseLines)
+        ? item.courseLines.map((cl: any) => ({ id: cl.id, name: cl.name }))
+        : [],
+      appointments: Array.isArray(item.appointments)
+        ? item.appointments.map((ap: any) => ({
+            id: ap.id,
+            status: ap.status || "WAITING",
+            note: ap.note || undefined,
+            candidate: ap.candidate
+              ? {
+                  id: ap.candidate.id,
+                  fullName: ap.candidate.fullName,
+                  phoneNumber: ap.candidate.phoneNumber || undefined,
+                }
+              : null,
+          }))
+        : [],
+    }));
+  } catch (err) {
+    console.error("Lỗi khi fetchOfficeHours:", err);
+    return [];
+  }
 }

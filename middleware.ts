@@ -29,14 +29,14 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/profile") ||
     pathname.startsWith("/dashboard");
 
-  // 2. Chưa đăng nhập nhưng cố truy cập các route được bảo vệ -> Chặn và chuyển hướng về /login
+  // 2. Chưa đăng nhập nhưng cố truy cập các route được bảo vệ -> Chuyển hướng về /login
   if (!isAuthenticated && isProtectedPath) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // 3. Chặn route phân quyền theo vai trò (Role-Based Route Guarding)
+  // 3. Chặn route và phân quyền theo vai trò (Strict Role & Permissions Guarding)
   if (isAuthenticated) {
     const isAdmin = userRole.includes("admin");
     const isTeacherFullTime = userRole.includes("full-time") || userRole.includes("fulltime");
@@ -51,45 +51,55 @@ export function middleware(request: NextRequest) {
       } catch (_) {}
     }
 
-    // 3.1 Kiểm soát các route /admin/*
+    // --- QUY TẮC 1: CHẶN TRUY CẬP CHÉO VAI TRÒ -> TRẢ VỀ NOT-FOUND (404) ---
+    // Role nào chỉ được phép đi vào route mang tiền tố của chính role đó!
     if (pathname.startsWith("/admin")) {
-      // a) /admin/dashboard: Chỉ Admin thực thụ mới được vào Dashboard của Admin
-      if (pathname === "/admin/dashboard") {
-        if (!isAdmin) {
-          return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
-        }
+      if (!isAdmin) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
       }
-      // b) /admin/users (Quản lý tài khoản): Cho phép Admin HOẶC vai trò có quyền user_management
-      else if (pathname.startsWith("/admin/users")) {
-        const canAccessUsers = isAdmin || userPerms["user_management"] === true;
-        if (!canAccessUsers) {
-          return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
-        }
+    } else if (pathname.startsWith("/teacher-fulltime")) {
+      if (!isTeacherFullTime) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
       }
-      // c) /admin/permissions (Phân quyền màn hình): Cho phép Admin HOẶC vai trò có quyền screen_permission_management
-      else if (pathname.startsWith("/admin/permissions")) {
-        const canAccessPerms = isAdmin || userPerms["screen_permission_management"] === true;
-        if (!canAccessPerms) {
-          return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
-        }
-      }
-      // d) Các route /admin khác: Chỉ Admin
-      else if (!isAdmin) {
-        return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
+    } else if (pathname.startsWith("/teacher-parttime")) {
+      if (!isTeacherPartTime) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
       }
     }
 
-    // 3.2 Chặn route /teacher-fulltime/*: Chỉ Teacher Full-time (hoặc Admin) mới được vào
-    if (pathname.startsWith("/teacher-fulltime")) {
-      if (!isTeacherFullTime && !isAdmin) {
-        return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
+    // --- QUY TẮC 2: CHẶN THEO PHÂN QUYỀN MÀN HÌNH -> TRẢ VỀ NOT-FOUND (404) ---
+    // 2.1 Màn hình Quản lý tài khoản: /[role]/system-management/users hoặc /admin/users
+    if (pathname.includes("/system-management/users") || pathname === "/admin/users") {
+      const canAccessUsers = isAdmin || userPerms["user_management"] === true;
+      if (!canAccessUsers) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
       }
     }
 
-    // 3.3 Chặn route /teacher-parttime/*: Chỉ Teacher Part-time (hoặc Admin) mới được vào
-    if (pathname.startsWith("/teacher-parttime")) {
-      if (!isTeacherPartTime && !isAdmin) {
-        return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
+    // 2.2 Màn hình Phân quyền màn hình: /[role]/system-management/screen_permission hoặc /admin/permissions
+    if (
+      pathname.includes("/system-management/screen_permission") ||
+      pathname === "/admin/permissions"
+    ) {
+      const canAccessPerms = isAdmin || userPerms["screen_permission_management"] === true;
+      if (!canAccessPerms) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
+      }
+    }
+
+    // 2.3 Màn hình Quản lý cơ sở trực thuộc: /[role]/system-management/user_centres
+    if (pathname.includes("/system-management/user_centres")) {
+      const canAccessCentres = isAdmin || userPerms["user_centre_management"] === true;
+      if (!canAccessCentres) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
+      }
+    }
+
+    // 2.4 Màn hình Lịch trải nghiệm: /[role]/data-inspection/trial_schedules
+    if (pathname.includes("/data-inspection/trial_schedules")) {
+      const canAccessTrial = isAdmin || userPerms["trial_schedules"] === true;
+      if (!canAccessTrial) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
       }
     }
   }
