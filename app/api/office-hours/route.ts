@@ -34,25 +34,46 @@ export async function GET(request: NextRequest) {
     const currentRoleName = currentRoleRaw ? decodeURIComponent(currentRoleRaw).trim() : "Admin";
     const currentRolePoints = getRolePoints(currentRoleName);
 
-    // 3. Lấy danh sách cơ sở trực thuộc của tài khoản từ Supabase
+    // 3. Lấy danh sách cơ sở trực thuộc của tài khoản từ Supabase (ràng buộc theo tài khoản đang đăng nhập)
     let userCentres: Array<{ id: string; name: string; shortName?: string }> = [];
     if (currentUserId) {
       userCentres = await getUserCentres(currentUserId);
     }
 
-    // Nếu là Admin hoặc chưa có cơ sở nào nhưng là tài khoản cấp cao, hoặc user chọn lọc cơ sở cụ thể
-    let targetCentreIds: string[] = [];
-
-    if (centreFilter && centreFilter !== "all") {
-      targetCentreIds = [centreFilter];
-    } else if (userCentres.length > 0) {
-      targetCentreIds = userCentres.map((c) => c.id);
-    } else if (currentRolePoints === 1) {
-      // Admin nếu chưa gán cơ sở thì có thể xem toàn bộ
-      targetCentreIds = [];
+    // Nếu tài khoản chưa có cơ sở trực thuộc nào
+    if (userCentres.length === 0) {
+      return NextResponse.json({
+        success: true,
+        date: targetDateStr,
+        userCentres: [],
+        totalCount: 0,
+        officeHours: [],
+        message: "Tài khoản của bạn chưa được phân bổ cơ sở trực thuộc trong hệ thống.",
+      });
     }
 
-    // 4. Gọi LMS GraphQL lấy lịch trải nghiệm (tự động loại bỏ Makeup)
+    const userCentreIds = new Set(userCentres.map((c) => c.id));
+    let targetCentreIds: string[] = [];
+
+    if (centreFilter && centreFilter !== "ALL" && centreFilter !== "all") {
+      // Nếu lọc theo 1 cơ sở, chỉ truy vấn nếu cơ sở đó thuộc danh sách cơ sở trực thuộc của tài khoản
+      if (userCentreIds.has(centreFilter)) {
+        targetCentreIds = [centreFilter];
+      } else {
+        return NextResponse.json({
+          success: true,
+          date: targetDateStr,
+          userCentres,
+          totalCount: 0,
+          officeHours: [],
+        });
+      }
+    } else {
+      // Mặc định truy vấn tất cả các cơ sở trực thuộc của tài khoản
+      targetCentreIds = userCentres.map((c) => c.id);
+    }
+
+    // 4. Gọi LMS GraphQL lấy lịch trải nghiệm theo đúng danh sách cơ sở trực thuộc (tự động loại bỏ Makeup)
     const officeHours = await fetchOfficeHours({
       centreIds: targetCentreIds.length > 0 ? targetCentreIds : undefined,
       timeFrom,

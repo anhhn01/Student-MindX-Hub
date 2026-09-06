@@ -491,29 +491,29 @@ export default function UserManagementScreen() {
             </span>
           </div>
 
-          <div className="overflow-x-auto w-full max-w-full">
-            <table className="w-full text-left border-collapse min-w-[760px]">
+          <div className="overflow-x-auto w-full max-w-full no-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[660px] lg:min-w-0">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/50">
-                  <th className="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
                     STT
                   </th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Họ Và Tên
                   </th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
                     Mã LMS
                   </th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
                     Loại Tài Khoản
                   </th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
                     Vai Trò
                   </th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
                     Trạng Thái
                   </th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-xs font-bold text-slate-500 dark:text-slate-400 text-center whitespace-nowrap">
                     Thao Tác
                   </th>
                 </tr>
@@ -543,38 +543,38 @@ export default function UserManagementScreen() {
                         key={user.id}
                         className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
                       >
-                        <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 text-center whitespace-nowrap font-mono">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-xs text-slate-500 dark:text-slate-400 text-center whitespace-nowrap font-mono">
                           {idx + 1}
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4">
                           <div className="font-bold text-xs text-slate-900 dark:text-white whitespace-nowrap">
                             {user.full_name || "Chưa đặt họ tên"}
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="inline-block px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono whitespace-nowrap">
                             {user.lms_code || "N/A"}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center">
                           {user.is_firebase ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 whitespace-nowrap">
                               <Flame className="w-3 h-3" />
                               <span>LMS MindX</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 whitespace-nowrap">
                               <CheckCircle2 className="w-3 h-3" />
                               <span>Cục bộ</span>
                             </span>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center">
                           {cannotModify ? (
                             <div className="flex items-center justify-center">
                               <span
                                 title="Khóa phân quyền cấp bậc"
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border ${getRoleBadgeStyle(
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap border ${getRoleBadgeStyle(
                                   user.role
                                 )}`}
                               >
@@ -587,7 +587,7 @@ export default function UserManagementScreen() {
                               value={user.role}
                               disabled={updatingId === user.id}
                               onChange={(e) => handleUpdateRole(user, e.target.value)}
-                              className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none whitespace-nowrap cursor-pointer"
+                              className="text-xs px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none whitespace-nowrap cursor-pointer"
                             >
                               {user.role === "Admin" && <option value="Admin">Admin</option>}
                               {user.role === "Teacher Full-time" && (
@@ -603,12 +603,12 @@ export default function UserManagementScreen() {
                             </select>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center">
                           {cannotModify ? (
                             <div className="flex items-center justify-center">
                               <span
                                 title="Khóa quyền thay đổi trạng thái"
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap border capitalize ${getStatusBadgeStyle(
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap border capitalize ${getStatusBadgeStyle(
                                   user.status
                                 )}`}
                               >
@@ -621,7 +621,7 @@ export default function UserManagementScreen() {
                               value={user.status.toLowerCase()}
                               disabled={updatingId === user.id}
                               onChange={(e) => handleUpdateStatus(user, e.target.value)}
-                              className={`text-xs px-2.5 py-1 rounded-lg border font-semibold whitespace-nowrap focus:outline-none cursor-pointer ${getStatusBadgeStyle(
+                              className={`text-xs px-2 py-1 rounded-lg border font-semibold whitespace-nowrap focus:outline-none cursor-pointer ${getStatusBadgeStyle(
                                 user.status
                               )}`}
                             >
@@ -631,7 +631,7 @@ export default function UserManagementScreen() {
                             </select>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 text-center">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center">
                           <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                             <button
                               onClick={() => setViewingUser(user)}

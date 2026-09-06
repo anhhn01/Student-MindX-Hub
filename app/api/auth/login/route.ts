@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 import { getRoleMenuPermissions } from "@/lib/services/permissions-service";
+import { signSmhToken } from "@/lib/auth/jwt";
+import { getUserTokenExpiryDays } from "@/lib/auth/token-settings";
 
 interface LoginRequest {
   lms_code?: string;
@@ -238,6 +240,21 @@ async function buildLoginSuccessResponse(
     })();
   }
 
+  // 1. Đọc cấu hình thời gian duy trì phiên đăng nhập của người dùng (mặc định 7 ngày, tối đa 30 ngày)
+  const userExpiryDays = getUserTokenExpiryDays(userData.id, lmsCode);
+
+  // 2. Ký token JWT định danh SMH với thời hạn tương ứng
+  const { token: smhToken, expiryDays, maxAgeSeconds } = await signSmhToken(
+    {
+      userId: userData.id,
+      lmsCode,
+      name: greetingName,
+      role: userRoleText,
+      status: statusText,
+    },
+    userExpiryDays
+  );
+
   const res = NextResponse.json(
     {
       success: true,
@@ -247,19 +264,31 @@ async function buildLoginSuccessResponse(
         lms_code: lmsCode,
         role: userRoleText, // Text string representation, NOT raw ID
         status: statusText, // Text string representation, NOT raw ID
+        token_expiry_days: expiryDays,
       },
-      token: firebaseData.idToken,
+      token: smhToken,
+      id_token: firebaseData.idToken,
       refresh_token: firebaseData.refreshToken,
       redirect_url: redirectUrl,
     },
     { status: 200 }
   );
 
+  // Lưu SMH JWT Token chính thức vào HttpOnly cookie để Middleware xác thực
+  res.cookies.set("smh_token", smhToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
+    path: "/",
+  });
+
   // Store user & Firebase authentication tokens in cookies for future operations
   res.cookies.set("user_id", userData.id, {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
@@ -267,27 +296,31 @@ async function buildLoginSuccessResponse(
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     maxAge: Number(firebaseData.expiresIn) || 3600,
+    sameSite: "lax",
     path: "/",
   });
 
   res.cookies.set("refresh_token", firebaseData.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
   res.cookies.set("user_name", encodeURIComponent(greetingName), {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
   res.cookies.set("user_role", encodeURIComponent(userRoleText), {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
@@ -295,7 +328,8 @@ async function buildLoginSuccessResponse(
   res.cookies.set("user_permissions", encodeURIComponent(JSON.stringify(userPerms)), {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 

@@ -319,20 +319,20 @@ export default function UserCentresManagementScreen() {
 
         {/* Bảng danh sách tài khoản & cơ sở */}
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 backdrop-blur-sm overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[680px] lg:min-w-0">
               <thead>
                 <tr className="border-b border-slate-800/80 bg-slate-900/80 text-xs font-semibold uppercase text-slate-400 tracking-wider">
-                  <th className="py-4 px-4 text-center whitespace-nowrap w-16">STT</th>
-                  <th className="py-4 px-4 text-center whitespace-nowrap w-32">Mã LMS</th>
-                  <th className="py-4 px-6 whitespace-nowrap min-w-[200px]">Họ và tên</th>
-                  <th className="py-4 px-4 text-center whitespace-nowrap w-36">Loại tài khoản</th>
-                  <th className="py-4 px-4 text-center whitespace-nowrap w-40">Vai trò</th>
-                  <th className="py-4 px-6 whitespace-nowrap min-w-[280px]">Cơ sở trực thuộc</th>
-                  <th className="py-4 px-4 text-center whitespace-nowrap w-36">Thao tác</th>
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap w-14">STT</th>
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap w-28">Mã LMS</th>
+                  <th className="py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap min-w-[160px]">Họ và tên</th>
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap w-32">Loại tài khoản</th>
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap w-36">Vai trò</th>
+                  <th className="py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap min-w-[220px]">Cơ sở trực thuộc</th>
+                  <th className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap w-32">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-sm">
+              <tbody className="divide-y divide-slate-800/60 text-xs sm:text-sm">
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400">
@@ -359,28 +359,28 @@ export default function UserCentresManagementScreen() {
                         className="hover:bg-slate-800/30 transition-colors group"
                       >
                         {/* 1. STT */}
-                        <td className="py-4 px-4 text-center text-slate-400 font-mono text-xs whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center text-slate-400 font-mono text-xs whitespace-nowrap">
                           {idx + 1}
                         </td>
 
                         {/* 2. Mã LMS */}
-                        <td className="py-4 px-4 text-center whitespace-nowrap">
-                          <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-800/80 text-rose-400 border border-slate-700/60">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap">
+                          <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-800/80 text-rose-400 border border-slate-700/60">
                             {user.lms_code || "—"}
                           </span>
                         </td>
 
                         {/* 3. Họ và tên */}
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-600 to-rose-400 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-md">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-rose-600 to-rose-400 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
                               {(user.full_name || user.lms_code || "U")
                                 .trim()
                                 .charAt(0)
                                 .toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-medium text-white group-hover:text-rose-300 transition-colors">
+                              <p className="font-medium text-xs sm:text-sm text-white group-hover:text-rose-300 transition-colors">
                                 {user.full_name || "Chưa cập nhật"}
                               </p>
                             </div>
@@ -388,9 +388,9 @@ export default function UserCentresManagementScreen() {
                         </td>
 
                         {/* 4. Loại tài khoản */}
-                        <td className="py-4 px-4 text-center whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
                               isLms
                                 ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
                                 : "bg-sky-500/10 text-sky-400 border-sky-500/20"
@@ -402,9 +402,9 @@ export default function UserCentresManagementScreen() {
                         </td>
 
                         {/* 5. Vai trò */}
-                        <td className="py-4 px-4 text-center whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap">
                           <span
-                            className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                               user.role.toLowerCase().includes("admin")
                                 ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
                                 : user.role.toLowerCase().includes("full-time") ||
@@ -418,24 +418,24 @@ export default function UserCentresManagementScreen() {
                         </td>
 
                         {/* 6. Danh sách cơ sở trực thuộc */}
-                        <td className="py-4 px-6">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4">
                           {centresList.length === 0 ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-slate-500 italic px-2.5 py-1 rounded bg-slate-950/60 border border-slate-800 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 text-xs text-slate-500 italic px-2 py-0.5 rounded bg-slate-950/60 border border-slate-800 whitespace-nowrap">
                               Chưa gán cơ sở
                             </span>
                           ) : (
-                            <div className="flex flex-wrap gap-1.5 max-w-md">
+                            <div className="flex flex-wrap gap-1 max-w-md">
                               {centresList.map((c) => (
                                 <span
                                   key={c.id}
                                   title={c.name}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/90 text-slate-200 border border-slate-700/80 whitespace-nowrap hover:border-rose-500/40 transition-colors"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800/90 text-slate-200 border border-slate-700/80 whitespace-nowrap hover:border-rose-500/40 transition-colors"
                                 >
                                   <Building2 className="w-3 h-3 text-rose-400 shrink-0" />
                                   <span className="font-semibold text-rose-300">
                                     {c.shortName || c.code || "CS"}:
                                   </span>
-                                  <span className="max-w-[140px] truncate">{c.name.replace(/^HCM\s*-\s*|^HN\s*-\s*/i, "")}</span>
+                                  <span className="max-w-[130px] truncate">{c.name.replace(/^HCM\s*-\s*|^HN\s*-\s*/i, "")}</span>
                                 </span>
                               ))}
                             </div>
@@ -443,11 +443,11 @@ export default function UserCentresManagementScreen() {
                         </td>
 
                         {/* 7. Thao tác */}
-                        <td className="py-4 px-4 text-center whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-2 sm:px-3 text-center whitespace-nowrap">
                           {user.can_edit ? (
                             <button
                               onClick={() => handleOpenEditModal(user)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 transition-all active:scale-95 shadow-sm whitespace-nowrap"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 transition-all active:scale-95 shadow-xs whitespace-nowrap"
                             >
                               <Building2 className="w-3.5 h-3.5" />
                               Sửa cơ sở
@@ -455,7 +455,7 @@ export default function UserCentresManagementScreen() {
                           ) : (
                             <span
                               title="Bạn không có quyền sửa tài khoản cấp bậc tương đương hoặc cao hơn"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/50 text-slate-500 border border-slate-800 cursor-not-allowed whitespace-nowrap"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800/50 text-slate-500 border border-slate-800 cursor-not-allowed whitespace-nowrap"
                             >
                               <Lock className="w-3 h-3" />
                               Đã khóa

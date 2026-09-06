@@ -17,6 +17,8 @@ import {
   Mail,
   Calendar,
   Sparkles,
+  Clock,
+  ShieldCheck,
 } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 
@@ -29,6 +31,7 @@ interface UserProfileData {
   account_source: string;
   role: string;
   status: string;
+  token_expiry_days?: number;
   created_at: string;
 }
 
@@ -39,6 +42,7 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [tokenExpiryDays, setTokenExpiryDays] = useState<number>(7);
   const [showPassword, setShowPassword] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -50,6 +54,9 @@ export default function ProfilePage() {
       if (res.ok && data.user) {
         setProfile(data.user);
         setFullName(data.user.full_name || "");
+        if (typeof data.user.token_expiry_days === "number") {
+          setTokenExpiryDays(data.user.token_expiry_days);
+        }
       } else {
         setFeedback({ type: "error", message: data.error || "Không thể tải hồ sơ cá nhân" });
       }
@@ -68,9 +75,29 @@ export default function ProfilePage() {
     e.preventDefault();
     setFeedback(null);
 
+    // 1. Ràng buộc họ tên: bắt buộc từ 2 đến 70 ký tự
+    const cleanName = fullName.trim();
+    if (!cleanName || cleanName.length < 2) {
+      setFeedback({ type: "error", message: "Họ và tên bắt buộc và phải có ít nhất 2 ký tự." });
+      return;
+    }
+    if (cleanName.length > 70) {
+      setFeedback({ type: "error", message: "Họ và tên không được vượt quá 70 ký tự." });
+      return;
+    }
+
+    // 2. Ràng buộc mật khẩu: Kiểm tra độ dài và xác nhận
     if (password && password.length > 0) {
+      if (profile?.is_firebase) {
+        setFeedback({ type: "error", message: "Tài khoản LMS không được phép thay đổi mật khẩu tại đây." });
+        return;
+      }
       if (password.length < 6) {
         setFeedback({ type: "error", message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
+        return;
+      }
+      if (password.length > 50) {
+        setFeedback({ type: "error", message: "Mật khẩu mới không được vượt quá 50 ký tự." });
         return;
       }
       if (password !== confirmPassword) {
@@ -79,20 +106,27 @@ export default function ProfilePage() {
       }
     }
 
+    // 3. Ràng buộc thời gian duy trì tài khoản: 1 - 30 ngày
+    const safeDays = Math.min(30, Math.max(1, Math.round(Number(tokenExpiryDays) || 7)));
+
     setSaveLoading(true);
     try {
       const res = await fetch(API_ROUTES.USER.API_PROFILE, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: fullName,
+          full_name: cleanName,
           password: password.trim().length > 0 ? password : undefined,
+          token_expiry_days: safeDays,
         }),
       });
 
       const data = await res.json();
       if (res.ok) {
-        setFeedback({ type: "success", message: "Đã cập nhật thông tin cá nhân thành công!" });
+        setFeedback({
+          type: "success",
+          message: `Đã cập nhật thông tin cá nhân và cài đặt duy trì tài khoản (${safeDays} ngày) thành công!`,
+        });
         setPassword("");
         setConfirmPassword("");
         fetchProfile();
@@ -253,12 +287,17 @@ export default function ProfilePage() {
 
                   {/* Họ và tên */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Họ và tên *
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span>Họ và tên *</span>
+                      <span className={`text-[10px] ${fullName.length > 70 ? "text-rose-500 font-bold" : "text-slate-400"}`}>
+                        {fullName.length}/70 ký tự
+                      </span>
                     </label>
                     <input
                       type="text"
                       required
+                      minLength={2}
+                      maxLength={70}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Nhập họ và tên..."
@@ -304,48 +343,103 @@ export default function ProfilePage() {
                     <p className="text-xs text-slate-400 mb-4">
                       {profile.is_firebase
                         ? "Tài khoản LMS xác thực trực tiếp qua hệ thống LMS MindX nên không thay đổi mật khẩu tại đây."
-                        : "Để trống nếu bạn không có nhu cầu thay đổi mật khẩu hiện tại."}
+                        : "Để trống nếu bạn không có nhu cầu thay đổi mật khẩu hiện tại (Ràng buộc: 6 - 50 ký tự)."}
                     </p>
 
                     {!profile.is_firebase ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                            Mật khẩu mới
-                          </label>
-                          <div className="relative">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Mật khẩu mới
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                autoComplete="new-password"
+                                placeholder="Tối thiểu 6 ký tự..."
+                                maxLength={50}
+                                className="w-full pl-4 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Xác nhận mật khẩu mới
+                            </label>
                             <input
                               type={showPassword ? "text" : "password"}
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
                               autoComplete="new-password"
-                              placeholder="Tối thiểu 6 ký tự..."
-                              className="w-full pl-4 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                              placeholder="Nhập lại mật khẩu mới..."
+                              maxLength={50}
+                              className={`w-full px-4 py-2.5 rounded-2xl border bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 transition-all ${
+                                confirmPassword && password !== confirmPassword
+                                  ? "border-rose-500 focus:ring-rose-500"
+                                  : confirmPassword && password === confirmPassword
+                                  ? "border-emerald-500 focus:ring-emerald-500"
+                                  : "border-slate-200 dark:border-slate-800 focus:ring-rose-500"
+                              }`}
                             />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              tabIndex={-1}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                            Xác nhận mật khẩu mới
-                          </label>
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            autoComplete="new-password"
-                            placeholder="Nhập lại mật khẩu mới..."
-                            className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
-                          />
-                        </div>
+                        {/* Password strength and match hints */}
+                        {password.length > 0 && (
+                          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-500">Độ mạnh mật khẩu:</span>
+                              <span
+                                className={`font-bold ${
+                                  password.length < 6
+                                    ? "text-rose-500"
+                                    : password.length < 10
+                                    ? "text-amber-500"
+                                    : "text-emerald-500"
+                                }`}
+                              >
+                                {password.length < 6
+                                  ? "Yếu (ít hơn 6 ký tự)"
+                                  : password.length < 10
+                                  ? "Trung bình"
+                                  : "Mạnh"}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${
+                                  password.length < 6
+                                    ? "w-1/4 bg-rose-500"
+                                    : password.length < 10
+                                    ? "w-2/3 bg-amber-500"
+                                    : "w-full bg-emerald-500"
+                                }`}
+                              />
+                            </div>
+                            {confirmPassword && password !== confirmPassword && (
+                              <p className="text-rose-500 text-[11px] font-medium pt-1">
+                                ⚠ Mật khẩu xác nhận chưa trùng khớp.
+                              </p>
+                            )}
+                            {confirmPassword && password === confirmPassword && (
+                              <p className="text-emerald-500 text-[11px] font-medium pt-1">
+                                ✓ Mật khẩu xác nhận trùng khớp hoàn toàn.
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs flex items-center gap-2">
@@ -353,6 +447,112 @@ export default function ProfilePage() {
                         <span>Chức năng đổi mật khẩu bị khóa cho tài khoản LMS có sẵn.</span>
                       </div>
                     )}
+                  </div>
+
+                  {/* Phần Cấu Hình Phiên Đăng Nhập & Duy Trì Tài Khoản (Bảo Mật JWT) */}
+                  <div className="pt-5 border-t border-slate-100 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-rose-500" />
+                        <span>Thời Gian Duy Trì Đăng Nhập (Bảo Mật JWT)</span>
+                      </h4>
+                      <span className="px-3 py-1 rounded-full text-xs font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                        {tokenExpiryDays} ngày
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-3.5">
+                      Tài khoản sẽ duy trì phiên đăng nhập trong thời gian này. Mặc định là 7 ngày, tối đa 30 ngày. Khi hết hạn, hệ thống sẽ tự động yêu cầu đăng nhập lại để bảo vệ thông tin cá nhân.
+                    </p>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {[
+                        { days: 1, label: "1 ngày (Tối thiểu)" },
+                        { days: 7, label: "7 ngày (Mặc định)" },
+                        { days: 14, label: "14 ngày" },
+                        { days: 30, label: "30 ngày (Tối đa)" },
+                      ].map((preset) => (
+                        <button
+                          key={preset.days}
+                          type="button"
+                          onClick={() => setTokenExpiryDays(preset.days)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            tokenExpiryDays === preset.days
+                              ? "bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-2 ring-rose-500/40"
+                              : "bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800"
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Range slider & Number input */}
+                    <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                      <div className="flex-1">
+                        <div className="flex justify-between text-[11px] text-slate-400 font-semibold mb-1.5">
+                          <span>1 ngày</span>
+                          <span>7 ngày</span>
+                          <span>15 ngày</span>
+                          <span>30 ngày</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={30}
+                          step={1}
+                          value={tokenExpiryDays}
+                          onChange={(e) => setTokenExpiryDays(Math.min(30, Math.max(1, Math.round(Number(e.target.value)))))}
+                          className="w-full accent-rose-600 cursor-pointer h-2 bg-slate-200 dark:bg-slate-800 rounded-lg"
+                        />
+                      </div>
+                      <div className="w-28">
+                        <label className="block text-[10px] text-slate-400 font-medium mb-1 text-center">Tùy chỉnh (1 - 30)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={30}
+                          step={1}
+                          value={tokenExpiryDays}
+                          onKeyDown={(e) => {
+                            if (["-", "+", "e", "E", "."].includes(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw === "") {
+                              setTokenExpiryDays(1);
+                              return;
+                            }
+                            const val = Math.round(Number(raw));
+                            if (isNaN(val)) return;
+                            if (val > 30) setTokenExpiryDays(30);
+                            else if (val < 1) setTokenExpiryDays(1);
+                            else setTokenExpiryDays(val);
+                          }}
+                          onBlur={() => {
+                            const val = Math.round(Number(tokenExpiryDays));
+                            if (isNaN(val) || val < 1) setTokenExpiryDays(1);
+                            else if (val > 30) setTokenExpiryDays(30);
+                            else setTokenExpiryDays(val);
+                          }}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center font-bold text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live calculation banner & System constraints indicator */}
+                    <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs py-2.5 px-3.5 rounded-xl bg-rose-500/5 border border-rose-500/15 text-rose-600 dark:text-rose-400">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 shrink-0 text-rose-500" />
+                        <span className="font-medium">Ràng buộc hệ thống:</span>
+                        <span className="text-slate-500 dark:text-slate-400">Tối thiểu 1 ngày • Mặc định 7 ngày • Tối đa 30 ngày</span>
+                      </div>
+                      <div className="font-bold text-right">
+                        Hiệu lực: {tokenExpiryDays} ngày ({tokenExpiryDays * 24} giờ)
+                      </div>
+                    </div>
                   </div>
 
                   {/* Nút Submit */}

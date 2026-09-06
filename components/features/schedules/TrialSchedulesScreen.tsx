@@ -238,6 +238,8 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
   // Ref container để chụp ảnh Ultra HD 3x
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const campusContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const exportAllRef = useRef<HTMLDivElement>(null);
+  const exportCampusRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [copyingImage, setCopyingImage] = useState<boolean>(false);
   const [copyingCampusId, setCopyingCampusId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -480,7 +482,8 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
 
   // Sao chép ảnh của một cơ sở cụ thể (chỉ dành cho cơ sở có ca trải nghiệm)
   const handleCopyCampusImage = async (centreId: string, campusName: string) => {
-    const node = campusContainerRefs.current[centreId];
+    // Ưu tiên export template được định dạng cỡ chữ to, đậm nét chuyên biệt cho gửi Zalo
+    const node = exportCampusRefs.current[centreId] || campusContainerRefs.current[centreId];
     if (!node) {
       showToast("error", `Không tìm thấy vùng dữ liệu cơ sở ${campusName} để sao chép.`);
       return;
@@ -488,37 +491,21 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
 
     setCopyingCampusId(centreId);
     try {
-      // Đo lường độ rộng thực tế của bảng để triệt tiêu hoàn toàn thanh cuộn ngang khi xuất ảnh
-      const table = node.querySelector("table");
-      const fullWidth = table
-        ? Math.max(table.scrollWidth, node.scrollWidth, 1200)
-        : Math.max(node.scrollWidth, 1200);
-
       const blob = await htmlToImage.toBlob(node, {
-        pixelRatio: 3,
+        pixelRatio: 2.5,
         backgroundColor: "#0B0F17",
         cacheBust: true,
-        width: fullWidth,
+        width: 1250,
+        height: node.scrollHeight || node.offsetHeight,
         style: {
-          width: `${fullWidth}px`,
+          width: "1250px",
           maxWidth: "none",
+          position: "relative",
+          left: "0px",
+          top: "0px",
+          margin: "0px",
           overflow: "hidden",
-          overflowX: "hidden",
-          overflowY: "hidden",
           scrollbarWidth: "none",
-        },
-        filter: (domNode) => {
-          if (domNode instanceof HTMLElement) {
-            if (domNode.classList.contains("hide-on-export")) {
-              return false;
-            }
-            // Triệt tiêu toàn bộ thanh cuộn trên các node con khi kết xuất ảnh
-            domNode.style.scrollbarWidth = "none";
-            domNode.style.overflow = "hidden";
-            domNode.style.overflowX = "hidden";
-            domNode.style.overflowY = "hidden";
-          }
-          return true;
         },
       });
 
@@ -553,7 +540,9 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
 
   // Sao chép toàn bộ lịch các cơ sở
   const handleCopyTableImage = async () => {
-    if (!tableContainerRef.current) return;
+    // Ưu tiên export template chứa toàn bộ cơ sở được format to rõ chuyên dụng
+    const node = exportAllRef.current || tableContainerRef.current;
+    if (!node) return;
     const totalCases = structuredTable.reduce((sum, c) => sum + c.caseCount, 0);
     if (totalCases === 0) {
       showToast("error", "Không có ca trải nghiệm nào trong ngày để sao chép.");
@@ -562,38 +551,21 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
 
     setCopyingImage(true);
     try {
-      const node = tableContainerRef.current;
-      const tables = node.querySelectorAll("table");
-      let fullWidth = node.scrollWidth;
-      tables.forEach((t) => {
-        fullWidth = Math.max(fullWidth, t.scrollWidth);
-      });
-      fullWidth = Math.max(fullWidth, 1200);
-
       const blob = await htmlToImage.toBlob(node, {
-        pixelRatio: 3,
+        pixelRatio: 2.5,
         backgroundColor: "#0B0F17",
         cacheBust: true,
-        width: fullWidth,
+        width: 1250,
+        height: node.scrollHeight || node.offsetHeight,
         style: {
-          width: `${fullWidth}px`,
+          width: "1250px",
           maxWidth: "none",
+          position: "relative",
+          left: "0px",
+          top: "0px",
+          margin: "0px",
           overflow: "hidden",
-          overflowX: "hidden",
-          overflowY: "hidden",
           scrollbarWidth: "none",
-        },
-        filter: (domNode) => {
-          if (domNode instanceof HTMLElement) {
-            if (domNode.classList.contains("hide-on-export")) {
-              return false;
-            }
-            domNode.style.scrollbarWidth = "none";
-            domNode.style.overflow = "hidden";
-            domNode.style.overflowX = "hidden";
-            domNode.style.overflowY = "hidden";
-          }
-          return true;
         },
       });
 
@@ -843,37 +815,37 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
                   }}
                   className="bg-white dark:bg-[#0E131F] rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm"
                 >
-                  <div className="overflow-x-auto overscroll-x-contain touch-pan-x no-scrollbar">
-                    <table className="w-full text-base text-left border-collapse min-w-[1100px] lg:min-w-[1200px]">
-                      {/* Header màu Đỏ Ruby chuẩn mockup - chữ to rõ ràng nổi bật */}
+                  <div className="overflow-x-auto no-scrollbar">
+                    <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[680px] lg:min-w-0">
+                      {/* Header màu Đỏ Ruby chuẩn mockup - gọn gàng, vừa vặn khung hình */}
                       <thead>
-                        <tr className="bg-[#8B0000] dark:bg-[#7F1D1D] text-white font-black text-center text-base sm:text-lg tracking-wider uppercase select-none border-b border-rose-950">
-                          <th className="py-4 sm:py-5 px-3 sm:px-4 w-[180px] sm:w-[200px] border-r border-rose-900/60 whitespace-nowrap">
+                        <tr className="bg-[#8B0000] dark:bg-[#7F1D1D] text-white font-bold text-center text-xs sm:text-sm tracking-wider uppercase select-none border-b border-rose-950">
+                          <th className="py-2.5 sm:py-3 px-2 sm:px-3 w-[110px] sm:w-[130px] border-r border-rose-900/60 whitespace-nowrap">
                             Cơ sở
                           </th>
-                          <th className="py-4 sm:py-5 px-2 sm:px-3 w-[120px] sm:w-[140px] border-r border-rose-900/60 whitespace-nowrap">
+                          <th className="py-2.5 sm:py-3 px-1.5 sm:px-2 w-[65px] sm:w-[75px] border-r border-rose-900/60 whitespace-nowrap">
                             Khối
                           </th>
-                          <th className="py-4 sm:py-5 px-2 sm:px-3 w-[90px] sm:w-[100px] border-r border-rose-900/60 whitespace-nowrap">
+                          <th className="py-2.5 sm:py-3 px-1.5 sm:px-2 w-[55px] sm:w-[65px] border-r border-rose-900/60 whitespace-nowrap">
                             Ca
                           </th>
-                          <th className="py-4 sm:py-5 px-3 sm:px-4 w-[160px] sm:w-[180px] border-r border-rose-900/60 whitespace-nowrap">
+                          <th className="py-2.5 sm:py-3 px-2 sm:px-2.5 w-[100px] sm:w-[115px] border-r border-rose-900/60 whitespace-nowrap">
                             Khung giờ
                           </th>
-                          <th className="py-4 sm:py-5 px-3 sm:px-4 w-[180px] sm:w-[210px] border-r border-rose-900/60 whitespace-nowrap">
+                          <th className="py-2.5 sm:py-3 px-2 sm:px-2.5 w-[130px] sm:w-[150px] border-r border-rose-900/60 whitespace-nowrap">
                             Mentor
                           </th>
-                          <th className="py-4 sm:py-5 px-3 sm:px-4 w-[140px] sm:w-[160px] border-r border-rose-900/60 whitespace-nowrap">
+                          <th className="py-2.5 sm:py-3 px-2 sm:px-2.5 w-[85px] sm:w-[100px] border-r border-rose-900/60 whitespace-nowrap">
                             Số lượng
                           </th>
-                          <th className="py-4 sm:py-5 px-4 min-w-[220px] sm:min-w-[260px] whitespace-nowrap">
+                          <th className="py-2.5 sm:py-3 px-3 min-w-[130px] sm:min-w-[170px] whitespace-nowrap">
                             Note
                           </th>
                         </tr>
-                        {/* Banner hiển thị ngày và cơ sở - chữ to đậm nét */}
-                        <tr className="bg-slate-950 text-white dark:bg-black font-black text-center text-base sm:text-lg tracking-wider border-b border-slate-700 select-none">
-                          <td colSpan={7} className="py-3.5 sm:py-4 px-4 text-center">
-                            <span className="uppercase tracking-wide font-black">
+                        {/* Banner hiển thị ngày và cơ sở */}
+                        <tr className="bg-slate-950 text-white dark:bg-black font-bold text-center text-xs sm:text-sm tracking-wide border-b border-slate-700 select-none">
+                          <td colSpan={7} className="py-2 sm:py-2.5 px-3 text-center">
+                            <span className="uppercase tracking-wide">
                               LỊCH TRẢI NGHIỆM ({campusName}) • {formatDisplayDate(selectedDate)}
                             </span>
                           </td>
@@ -921,15 +893,15 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
                                 {renderCampusCell && (
                                   <td
                                     rowSpan={centreBlock.totalRows}
-                                    className="py-5 px-3 text-center align-middle border-r border-slate-300 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 select-none"
+                                    className="py-3 px-2 sm:px-2.5 text-center align-middle border-r border-slate-300 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 select-none"
                                   >
-                                    <div className="flex flex-col items-center justify-center gap-2.5">
-                                      <span className="font-black text-lg sm:text-xl tracking-wide text-slate-950 dark:text-white uppercase">
+                                    <div className="flex flex-col items-center justify-center gap-1.5">
+                                      <span className="font-bold text-xs sm:text-sm tracking-wide text-slate-900 dark:text-white uppercase">
                                         {campusName}
                                       </span>
                                       {hasCases ? (
                                         <>
-                                          <span className="text-xs sm:text-sm font-black px-3 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                                          <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
                                             {caseCount} ca trải nghiệm
                                           </span>
                                           {/* Nút sao chép ảnh cơ sở (ẩn khi xuất ảnh) */}
@@ -940,13 +912,13 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
                                               handleCopyCampusImage(centreId, campusName);
                                             }}
                                             disabled={copyingCampusId === centreId}
-                                            className="hide-on-export inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white text-xs sm:text-sm font-bold shadow-md shadow-rose-600/20 hover:shadow transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                            className="hide-on-export inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white text-[11px] sm:text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
                                             title={`Sao chép ảnh lịch cơ sở ${campusName}`}
                                           >
                                             {copyingCampusId === centreId ? (
-                                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                              <RefreshCw className="w-3 h-3 animate-spin" />
                                             ) : (
-                                              <Copy className="w-3.5 h-3.5" />
+                                              <Copy className="w-3 h-3" />
                                             )}
                                             <span>
                                               {copyingCampusId === centreId
@@ -956,7 +928,7 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
                                           </button>
                                         </>
                                       ) : (
-                                        <span className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-500 italic whitespace-nowrap">
+                                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 italic whitespace-nowrap">
                                           Chưa có ca
                                         </span>
                                       )}
@@ -968,63 +940,63 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
                                 {renderDeptCell && (
                                   <td
                                     rowSpan={deptBlock.totalRows}
-                                    className={`py-4 sm:py-5 px-2 text-center align-middle font-black text-base sm:text-lg tracking-wider border-r border-slate-300 dark:border-slate-800 uppercase select-none ${deptBgClass}`}
+                                    className={`py-2.5 px-1.5 text-center align-middle font-bold text-xs sm:text-sm tracking-wider border-r border-slate-300 dark:border-slate-800 uppercase select-none ${deptBgClass}`}
                                   >
                                     {deptBlock.department}
                                   </td>
                                 )}
 
                                 {/* Cột 3: Ca (SÁNG, CHIỀU, TỐI) */}
-                                <td className="py-4 sm:py-5 px-3 text-center align-middle font-black text-base sm:text-lg text-slate-950 dark:text-white border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
+                                <td className="py-2.5 px-1.5 text-center align-middle font-semibold text-xs sm:text-sm text-slate-900 dark:text-slate-100 border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
                                   {row.shift}
                                 </td>
 
                                 {/* Cột 4: Khung giờ */}
-                                <td className="py-4 sm:py-5 px-3 text-center align-middle font-black text-base sm:text-lg text-slate-900 dark:text-slate-100 border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
+                                <td className="py-2.5 px-2 text-center align-middle font-medium text-xs sm:text-sm text-slate-700 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
                                   {row.timeRange}
                                 </td>
 
                                 {/* Cột 5: Mentor & Trạng thái */}
-                                <td className="py-4 sm:py-5 px-3 text-center align-middle border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
+                                <td className="py-2.5 px-2 text-center align-middle border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
                                   {row.mentorName ? (
-                                    <div className="flex flex-col items-center gap-1.5">
-                                      <span className="font-black text-slate-950 dark:text-white text-base sm:text-lg">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                                         {row.mentorName}
                                       </span>
                                       {row.mentorStatus === "CONFIRMED" ? (
-                                        <span className="inline-flex items-center gap-1 px-3.5 py-0.5 rounded-md text-xs sm:text-sm font-black bg-[#BFDBFE] text-[#1E3A8A] dark:bg-sky-900 dark:text-sky-100 border border-blue-400 dark:border-sky-600 shadow-xs">
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-semibold bg-[#DCEBFC] text-[#1E40AF] dark:bg-sky-950 dark:text-sky-300 border border-[#BFDBFE] dark:border-sky-800">
                                           Xác nhận
                                         </span>
                                       ) : (
-                                        <span className="inline-flex items-center gap-1 px-3.5 py-0.5 rounded-md text-xs sm:text-sm font-black bg-[#FECDD3] text-[#9F1239] dark:bg-rose-900 dark:text-rose-100 border border-rose-400 dark:border-rose-600 shadow-xs">
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-semibold bg-[#FFE2E5] text-[#991B1B] dark:bg-rose-950 dark:text-rose-300 border border-[#FECDD3] dark:border-rose-800">
                                           Cần xác nhận
                                         </span>
                                       )}
                                     </div>
                                   ) : (
-                                    <div className="h-7 w-28 mx-auto rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60" />
+                                    <div className="h-5 w-20 mx-auto rounded bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60" />
                                   )}
                                 </td>
 
                                 {/* Cột 6: Số lượng */}
-                                <td className="py-4 sm:py-5 px-4 text-center align-middle border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
+                                <td className="py-2.5 px-2 text-center align-middle border-r border-slate-200 dark:border-slate-800/80 whitespace-nowrap">
                                   {row.hasData ? (
-                                    <span className="inline-flex items-center justify-center px-4 py-1.5 rounded-full text-sm sm:text-base font-black bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100 border border-rose-300 dark:border-rose-700 shadow-xs">
+                                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200/80 dark:border-rose-900/60">
                                       {row.studentCount} học viên
                                     </span>
                                   ) : (
-                                    <span className="text-slate-300 dark:text-slate-700 select-none font-bold text-base sm:text-lg">
+                                    <span className="text-slate-300 dark:text-slate-700 select-none font-bold text-xs sm:text-sm">
                                       --
                                     </span>
                                   )}
                                 </td>
 
                                 {/* Cột 7: Note */}
-                                <td className="py-4 sm:py-5 px-4 align-middle text-slate-800 dark:text-slate-200 text-sm sm:text-base font-bold">
+                                <td className="py-2.5 px-3 align-middle text-slate-700 dark:text-slate-200 text-xs sm:text-sm">
                                   {row.note ? (
-                                    <span className="whitespace-pre-line line-clamp-3">{row.note}</span>
+                                    <span className="whitespace-pre-line line-clamp-2">{row.note}</span>
                                   ) : (
-                                    <span className="text-slate-300 dark:text-slate-700 select-none font-bold text-base sm:text-lg">
+                                    <span className="text-slate-300 dark:text-slate-700 select-none font-medium text-xs">
                                       --
                                     </span>
                                   )}
@@ -1040,6 +1012,183 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
               );
             })
           )}
+        </div>
+
+        {/* =========================================================================
+            DEDICATED OFF-SCREEN EXPORT CONTAINER (CHỮ TO, RÕ NÉT CỰC ĐẸP ĐỂ GỬI ZALO)
+            Container này luôn được dựng sẵn tại tọa độ ngoài màn hình với độ rộng 1250px.
+            Tất cả cỡ chữ (text-lg, text-xl, font-black) và độ tương phản cao được bảo đảm
+            khi xuất ảnh qua Clipboard để gửi vào nhóm Zalo, hoàn toàn không làm ảnh hưởng
+            đến độ gọn gàng và responsive của giao diện trực tiếp trên web/mobile.
+            ========================================================================= */}
+        {/* =========================================================================
+            DEDICATED OFF-SCREEN EXPORT CONTAINER (CHỮ TO, RÕ NÉT CỰC ĐẸP ĐỂ GỬI ZALO)
+            Container ngoài chịu trách nhiệm ẩn tọa độ ngoài màn hình.
+            Container trong (exportAllRef) giữ tọa độ x = 0 để html-to-image chụp ảnh hoàn hảo
+            không bị hiện tượng đen ảnh hay lệch viewport.
+            ========================================================================= */}
+        <div
+          style={{
+            position: "fixed",
+            left: "-99999px",
+            top: 0,
+            pointerEvents: "none",
+            zIndex: -9999,
+          }}
+          aria-hidden="true"
+        >
+          <div
+            ref={exportAllRef}
+            style={{ width: "1250px", position: "relative", left: 0 }}
+            className="space-y-6 bg-[#0B0F17] p-6 text-white"
+          >
+            {/* Banner tiêu đề tổng thể nổi bật cho ảnh sao chép toàn bộ cơ sở */}
+            <div className="bg-gradient-to-r from-[#7F1D1D] via-[#991B1B] to-[#7F1D1D] rounded-2xl p-5 text-center border border-rose-800/80 shadow-2xl">
+              <h2 className="text-2xl font-black uppercase tracking-wider text-white">
+                LỊCH TRẢI NGHIỆM TỔNG THỂ • {formatDisplayDate(selectedDate)}
+              </h2>
+              <p className="text-sm font-bold text-rose-200 mt-1.5">
+                {structuredTable.filter((c) => c.hasCases).length} cơ sở có ca trải nghiệm • Tổng cộng {structuredTable.reduce((sum, c) => sum + c.caseCount, 0)} ca
+              </p>
+            </div>
+
+            {structuredTable
+              .filter((c) => c.hasCases)
+              .map((centreBlock) => {
+                const { centreId, campusName, caseCount, departments } = centreBlock;
+
+                return (
+                  <div
+                    key={`export_${centreId}`}
+                    ref={(el) => {
+                      exportCampusRefs.current[centreId] = el;
+                    }}
+                    style={{ width: "1250px", position: "relative", left: 0 }}
+                    className="bg-[#0B0F17] rounded-2xl border border-slate-800 overflow-hidden"
+                  >
+                  <table className="w-full text-left border-collapse" style={{ width: "1250px" }}>
+                    <thead>
+                      <tr className="bg-[#7F1D1D] text-white font-black text-center text-lg tracking-wider uppercase border-b border-rose-950">
+                        <th className="py-4 px-3 w-[180px] border-r border-rose-900/60 whitespace-nowrap">Cơ sở</th>
+                        <th className="py-4 px-2 w-[110px] border-r border-rose-900/60 whitespace-nowrap">Khối</th>
+                        <th className="py-4 px-2 w-[90px] border-r border-rose-900/60 whitespace-nowrap">Ca</th>
+                        <th className="py-4 px-3 w-[150px] border-r border-rose-900/60 whitespace-nowrap">Khung giờ</th>
+                        <th className="py-4 px-3 w-[200px] border-r border-rose-900/60 whitespace-nowrap">Mentor</th>
+                        <th className="py-4 px-3 w-[140px] border-r border-rose-900/60 whitespace-nowrap">Số lượng</th>
+                        <th className="py-4 px-4 min-w-[260px] whitespace-nowrap">Note</th>
+                      </tr>
+                      <tr className="bg-[#020617] text-white font-black text-center text-lg tracking-wider border-b border-slate-700">
+                        <td colSpan={7} className="py-4 px-4 text-center">
+                          <span className="uppercase tracking-wide font-black">
+                            LỊCH TRẢI NGHIỆM ({campusName}) • {formatDisplayDate(selectedDate)}
+                          </span>
+                        </td>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {departments.map((deptBlock, deptIdx) => {
+                        let isFirstRowOfDept = true;
+                        const isFirstRowOfCampus = deptIdx === 0;
+
+                        return deptBlock.rows.map((row, rowIdx) => {
+                          const renderCampusCell = isFirstRowOfCampus && rowIdx === 0;
+                          const renderDeptCell = isFirstRowOfDept;
+                          if (isFirstRowOfDept) isFirstRowOfDept = false;
+
+                          let rowBgClass = "bg-[#0E131F] text-slate-100";
+                          if (row.mentorStatus === "CONFIRMED" && row.hasData) {
+                            rowBgClass = "bg-[#162544] text-slate-100";
+                          } else if (row.mentorStatus === "WAITING" && row.hasData) {
+                            rowBgClass = "bg-[#3B151E] text-slate-100";
+                          }
+
+                          let deptBgClass = "bg-[#E11D48] text-white";
+                          if (deptBlock.department === "ART") deptBgClass = "bg-[#1E3A8A] text-white";
+                          else if (deptBlock.department === "ROBOTICS") deptBgClass = "bg-[#15803D] text-white";
+
+                          return (
+                            <tr key={`exp_row_${row.rowKey}`} className={`border-b border-slate-800 ${rowBgClass}`}>
+                              {renderCampusCell && (
+                                <td
+                                  rowSpan={centreBlock.totalRows}
+                                  className="py-5 px-3 text-center align-middle border-r border-slate-800 bg-slate-900/70"
+                                >
+                                  <div className="flex flex-col items-center justify-center gap-2">
+                                    <span className="font-black text-xl tracking-wide text-white uppercase">
+                                      {campusName}
+                                    </span>
+                                    <span className="text-sm font-black px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">
+                                      {caseCount} ca trải nghiệm
+                                    </span>
+                                  </div>
+                                </td>
+                              )}
+
+                              {renderDeptCell && (
+                                <td
+                                  rowSpan={deptBlock.totalRows}
+                                  className={`py-4 px-2 text-center align-middle font-black text-base tracking-wider border-r border-slate-800 uppercase ${deptBgClass}`}
+                                >
+                                  {deptBlock.department}
+                                </td>
+                              )}
+
+                              <td className="py-4 px-3 text-center align-middle font-black text-base text-white border-r border-slate-800 whitespace-nowrap">
+                                {row.shift}
+                              </td>
+
+                              <td className="py-4 px-3 text-center align-middle font-black text-base text-slate-200 border-r border-slate-800 whitespace-nowrap">
+                                {row.timeRange}
+                              </td>
+
+                              <td className="py-4 px-3 text-center align-middle border-r border-slate-800 whitespace-nowrap">
+                                {row.mentorName ? (
+                                  <div className="flex flex-col items-center gap-1.5">
+                                    <span className="font-black text-white text-lg">
+                                      {row.mentorName}
+                                    </span>
+                                    {row.mentorStatus === "CONFIRMED" ? (
+                                      <span className="inline-flex items-center gap-1 px-3.5 py-0.5 rounded-md text-sm font-black bg-blue-950 text-sky-200 border border-sky-600 shadow-xs">
+                                        Xác nhận
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-3.5 py-0.5 rounded-md text-sm font-black bg-rose-950 text-rose-200 border border-rose-600 shadow-xs">
+                                        Cần xác nhận
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-600 font-bold text-base">--</span>
+                                )}
+                              </td>
+
+                              <td className="py-4 px-4 text-center align-middle border-r border-slate-800 whitespace-nowrap">
+                                {row.hasData ? (
+                                  <span className="inline-flex items-center justify-center px-4 py-1.5 rounded-full text-base font-black bg-rose-950/80 text-rose-200 border border-rose-600/80 shadow-xs">
+                                    {row.studentCount} học viên
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-600 font-bold text-base">--</span>
+                                )}
+                              </td>
+
+                              <td className="py-4 px-4 align-middle text-slate-200 text-sm font-bold">
+                                {row.note ? (
+                                  <span className="whitespace-pre-line line-clamp-3">{row.note}</span>
+                                ) : (
+                                  <span className="text-slate-600 font-bold text-base">--</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                );
+              })}
+          </div>
         </div>
       </div>
     </AppLayout>

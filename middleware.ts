@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySmhToken } from "@/lib/auth/jwt";
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get("id_token")?.value;
+export async function middleware(request: NextRequest) {
+  const smhToken = request.cookies.get("smh_token")?.value;
+  const idToken = request.cookies.get("id_token")?.value;
   const rawRole = request.cookies.get("user_role")?.value;
   const userRole = rawRole ? decodeURIComponent(rawRole).trim().toLowerCase() : "";
   const { pathname } = request.nextUrl;
 
-  const isAuthenticated = !!token;
+  // Xác thực qua SMH JWT Token (hoặc id_token dự phòng)
+  let isAuthenticated = false;
+  let isTokenExpired = false;
+
+  if (smhToken) {
+    const result = await verifySmhToken(smhToken);
+    if (result.valid) {
+      isAuthenticated = true;
+    } else if (result.expired) {
+      isTokenExpired = true;
+    }
+  } else if (idToken) {
+    isAuthenticated = true;
+  }
 
   // Xác định dashboard chuẩn dựa theo vai trò của người dùng
   const getRoleDashboard = (role: string) => {
@@ -29,11 +44,23 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/profile") ||
     pathname.startsWith("/dashboard");
 
-  // 2. Chưa đăng nhập nhưng cố truy cập các route được bảo vệ -> Chuyển hướng về /login
+  // 2. Token hết hạn hoặc chưa đăng nhập nhưng cố truy cập route được bảo vệ -> Chuyển hướng về /login
   if (!isAuthenticated && isProtectedPath) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+    if (isTokenExpired) {
+      loginUrl.searchParams.set("reason", "expired");
+    }
+    const response = NextResponse.redirect(loginUrl);
+    // Xóa sạch cookie phiên làm việc đã hết hạn
+    response.cookies.delete("smh_token");
+    response.cookies.delete("id_token");
+    response.cookies.delete("refresh_token");
+    response.cookies.delete("user_id");
+    response.cookies.delete("user_name");
+    response.cookies.delete("user_role");
+    response.cookies.delete("user_permissions");
+    return response;
   }
 
   // 3. Chặn route và phân quyền theo vai trò (Strict Role & Permissions Guarding)

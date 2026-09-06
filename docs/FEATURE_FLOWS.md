@@ -579,8 +579,87 @@ sequenceDiagram
     
     opt Sao chép ảnh cơ sở có case gửi Zalo
         User->>UI: Bấm "Sao chép ảnh" dưới tên cơ sở có ca trải nghiệm
-        UI->>Clip: Kết xuất ảnh cơ sở bằng html-to-image (pixelRatio: 3, ẩn nút chép) & ghi ClipboardItem
+        UI->>Clip: Kết xuất ảnh cơ sở bằng html-to-image (pixelRatio: 2.5, ẩn nút chép) & ghi ClipboardItem
         UI->>User: Toast "Đã sao chép ảnh lịch cơ sở! Hãy mở Zalo và nhấn Ctrl+V để gửi ngay"
     end
-```
+
+    opt Sao chép ảnh toàn bộ cơ sở gửi Zalo
+        User->>UI: Bấm "Sao chép toàn bộ cơ sở" trên thanh công cụ
+        UI->>Clip: Kết xuất ảnh tổng thể từ export container riêng biệt kèm Banner tổng thể & ghi ClipboardItem
+        UI->>User: Toast "Đã sao chép toàn bộ lịch trải nghiệm! Hãy mở Zalo và nhấn Ctrl+V để gửi ngay"
+    end
+
+---
+
+## 12. Luồng Bảo Mật JWT & Tùy Chỉnh Duy Trì Phiên Đăng Nhập (JWT Security & Session Expiration Flow)
+
+### 12.1 Quy Chuẩn Token & Biến Môi Trường
+1. **Secret Key**: `JWT_SECRET=student-mindx-hub` được đặt duy nhất tại `.env`.
+2. **Ký Token**: Sử dụng thư viện `jose` (chuẩn Web Crypto API, tương thích cả Edge Runtime và Node.js API), thuật toán `HS256`.
+3. **Payload Token (`SmhJwtPayload`)**:
+   - `userId`: UUID người dùng trong Supabase.
+   - `lmsCode`: Mã định danh LMS.
+   - `name`: Tên đầy đủ người dùng.
+   - `role`: Tên vai trò (chữ).
+   - `status`: Trạng thái người dùng (chữ).
+   - `expiryDays`: Số ngày duy trì phiên đăng nhập (1 - 30 ngày).
+4. **Thời Hạn Duy Trì Phiên**:
+   - **Mặc định**: 7 ngày (`7d`).
+   - **Phạm vi cho phép**: 1 ngày $\le$ `expiryDays` $\le$ 30 ngày.
+   - **Cấu hình người dùng**: Có thể điều chỉnh trực tiếp tại trang Hồ sơ cá nhân (`/profile`). Khi lưu, hệ thống tự động cập nhật thời hạn mới và cấp lại `smh_token` tương ứng.
+
+### 12.2 Cơ Chế Kiểm Tra Hết Hạn & Đẩy Về Đăng Nhập
+1. **Tại Middleware (`middleware.ts`)**:
+   - Middleware đọc cookie `smh_token` trên mọi request tới các tuyến đường được bảo vệ (`/admin/*`, `/teacher-fulltime/*`, `/teacher-parttime/*`, `/profile`, `/dashboard`).
+   - Giải mã và kiểm tra hạn sử dụng qua `verifySmhToken`.
+   - **Khi token hết hạn (`expired === true`)**:
+     * Middleware xóa toàn bộ cookie xác thực (`smh_token`, `id_token`, `refresh_token`, `user_id`, `user_name`, `user_role`, `user_permissions`).
+     * Tự động chuyển hướng người dùng về trang đăng nhập với thông số: `/login?redirect=[targetPath]&reason=expired`.
+
+### 12.3 Giao Diện Cài Đặt & Ràng Buộc Dữ Liệu Tại Trang Cá Nhân (`/profile`)
+1. **Bộ Phím Tắt Nhanh (Preset Buttons)**:
+   - `1 ngày (Tối thiểu)`: Phiên đăng nhập ngắn, tăng tính bảo mật cho thiết bị công cộng.
+   - `7 ngày (Mặc định)`: Cân bằng tối ưu giữa tiện lợi và bảo mật.
+   - `14 ngày`: Duy trì 2 tuần cho người dùng thường xuyên.
+   - `30 ngày (Tối đa)`: Thời hạn tối đa theo quy định hệ thống.
+2. **Thanh Trượt Kéo (Range Slider) & Ô Nhập Trực Tiếp (Number Input)**:
+   - Đồng bộ song song 2 chiều giữa thanh trượt và ô số.
+   - Giới hạn cứng `min={1}`, `max={30}`, `step={1}`.
+   - Chặn ký tự phi số, số âm, số thập phân (`onKeyDown` loại trừ `-`, `+`, `e`, `.`).
+   - Hiển thị banner tính toán trực tiếp: `"Hiệu lực: {days} ngày ({days * 24} giờ)"`.
+3. **Ràng Buộc Họ Tên & Mật Khẩu**:
+   - Họ tên: Bắt buộc từ 2 đến 70 ký tự, hiển thị bộ đếm ký tự trực quan.
+   - Đổi mật khẩu: Khóa với tài khoản LMS; tài khoản nội bộ yêu cầu 6 - 50 ký tự, tích hợp thanh đo độ mạnh mật khẩu và kiểm tra trùng khớp xác nhận.
+
+---
+
+## 13. Danh Mục Bộ Tài Khoản Kiểm Thử Chuẩn (Official Test Accounts)
+
+Khi thực hiện kiểm thử tự động (Subagent, Browser tests, API tests), Agent **bắt buộc sử dụng đúng danh mục tài khoản sau, tuyệt đối không nhập linh tinh**:
+
+| Vai trò | Tài khoản (Mã LMS) | Mật khẩu | Phạm vi cơ sở trực thuộc | Đặc điểm |
+| :--- | :--- | :--- | :--- | :--- |
+| **Admin** | `admin` | `Nh@t@nh12@8` | Toàn bộ 101 cơ sở LMS MindX | Toàn quyền quản trị, phân quyền, xem lịch tất cả cơ sở |
+| **Teacher Full-time** | `anhhn01` | `Nh@t@nh12@8` | 4 cơ sở (Tên Lửa, Tây Thạnh, Lũy Bán Bích, Trường Chinh) | Quyền giảng viên full-time theo cơ sở trực thuộc |
+| **Teacher Part-time** | `huynhnhatanh` | `Nh@t@nh12@8` | 4 cơ sở (Tên Lửa, Tây Thạnh, Lũy Bán Bích, Trường Chinh) | Quyền giảng viên part-time theo cơ sở trực thuộc |
+
+---
+
+## 14. Luồng Thông Báo Triển Khai Qua Telegram (Post-Build Telegram Notification Flow)
+
+### 14.1 Nguyên Tắc Hoạt Động
+Do gói Vercel Hobby (Free) không hỗ trợ Webhook gửi ra ngoài, hệ thống chuyển sang giải pháp thực thi kịch bản thông báo tự động ngay sau khi lệnh build thành công:
+1. **Lệnh thực thi trong `package.json`**:
+   `"build": "next build && node telegram-notify.js"`
+2. **Kịch bản thông báo**: [telegram-notify.js](file:///d:/Documents/Practice/Self%20Project/SMH/telegram-notify.js) đặt tại thư mục gốc của dự án.
+3. **Trích xuất thông tin môi trường tự động từ Vercel**:
+   - `VERCEL_PROJECT_NAME`: Tên dự án Vercel.
+   - `VERCEL_PROJECT_PRODUCTION_URL`: URL phiên bản Production chính thức.
+   - `VERCEL_URL`: URL bản build Preview chi tiết.
+   - `deployTime`: Thời gian hoàn thành theo múi giờ Việt Nam (`Asia/Ho_Chi_Minh`).
+4. **Gửi tin nhắn qua Telegram Bot API**:
+   - Gọi API Telegram: `https://api.telegram.org/bot${token}/sendMessage`.
+   - Đọc cấu hình bảo mật `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID` từ biến môi trường.
+   - Định dạng tin nhắn HTML trực quan, vô hiệu hóa xem trước link (`disable_web_page_preview: true`).
+
 

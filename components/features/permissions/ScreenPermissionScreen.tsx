@@ -218,14 +218,14 @@ export default function ScreenPermissionScreen() {
             </span>
           </div>
 
-          <div className="overflow-x-auto w-full max-w-full">
-            <table className="w-full text-left border-collapse min-w-[760px]">
+          <div className="overflow-x-auto w-full max-w-full no-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[660px] lg:min-w-0">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/50">
-                  <th className="py-4 px-4 sm:px-6 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider min-w-[220px] whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-3 sm:px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider min-w-[190px] whitespace-nowrap">
                     Cấu Trúc Menu Hệ Thống
                   </th>
-                  <th className="py-4 px-4 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider text-center min-w-[180px] whitespace-nowrap">
+                  <th className="py-2.5 sm:py-3 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider text-center min-w-[150px] whitespace-nowrap">
                     Đường Dẫn Route Mẫu
                   </th>
                   {roles.map((role) => {
@@ -233,7 +233,7 @@ export default function ScreenPermissionScreen() {
                     return (
                       <th
                         key={role.id}
-                        className="py-4 px-4 sm:px-6 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider text-center min-w-[140px] whitespace-nowrap"
+                        className="py-2.5 sm:py-3 px-3 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider text-center min-w-[110px] whitespace-nowrap"
                       >
                         <div className="flex flex-col items-center justify-center gap-1">
                           <div className="flex items-center gap-1.5 justify-center">
@@ -274,16 +274,16 @@ export default function ScreenPermissionScreen() {
                     <React.Fragment key={parentMenu.id}>
                       {/* PARENT MENU ROW */}
                       <tr className="bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100/50 dark:hover:bg-slate-900/60 transition-colors">
-                        <td className="py-4 px-4 sm:px-6">
-                          <div className="flex items-center gap-2.5 whitespace-nowrap font-bold text-sm text-slate-900 dark:text-white">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4">
+                          <div className="flex items-center gap-2 whitespace-nowrap font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
                             <Settings className="w-4 h-4 text-rose-500 shrink-0" />
                             <span>{parentMenu.name}</span>
-                            <span className="text-[11px] font-normal px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 whitespace-nowrap">
                               Menu Chính
                             </span>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-xs font-mono text-slate-400 dark:text-slate-500 text-center whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-3 text-xs font-mono text-slate-400 dark:text-slate-500 text-center whitespace-nowrap">
                           /[role]/system-management
                         </td>
                         {roles.map((role) => {
@@ -292,18 +292,18 @@ export default function ScreenPermissionScreen() {
                           const isLocked = role.points <= currentUserRolePoints;
 
                           return (
-                            <td key={role.id} className="py-4 px-4 sm:px-6 text-center">
+                            <td key={role.id} className="py-2.5 sm:py-3 px-3 text-center">
                               <div className="flex justify-center items-center">
                                 <button
                                   type="button"
                                   disabled={isLocked || isUpdating}
                                   onClick={() => handleToggle(role.name, role.points, parentMenu.code, true)}
-                                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                                     isEnabled ? "bg-rose-600" : "bg-slate-300 dark:bg-slate-700"
                                   } ${isLocked ? "opacity-40 cursor-not-allowed grayscale" : ""}`}
                                 >
                                   <span
-                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                                       isEnabled ? "translate-x-5" : "translate-x-0"
                                     }`}
                                   />
@@ -320,8 +320,8 @@ export default function ScreenPermissionScreen() {
                           key={child.id}
                           className="hover:bg-slate-50/40 dark:hover:bg-slate-900/20 transition-colors"
                         >
-                          <td className="py-3.5 px-4 sm:px-6 sm:pl-12">
-                            <div className="flex items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-300 pl-4 sm:pl-6">
+                          <td className="py-2 px-3 sm:px-4 sm:pl-10">
+                            <div className="flex items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-700 dark:text-slate-300 pl-3 sm:pl-5">
                               <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 shrink-0" />
                               {child.code === "user_management" ? (
                                 <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -331,8 +331,8 @@ export default function ScreenPermissionScreen() {
                               <span>{child.name}</span>
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 text-xs font-mono text-center whitespace-nowrap">
-                            <span className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-800">
+                          <td className="py-2 px-3 text-xs font-mono text-center whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-900 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-800 text-[11px]">
                               {child.code === "user_management"
                                 ? `/[role]/system-management/users`
                                 : `/[role]/system-management/screen_permission`}
@@ -346,7 +346,7 @@ export default function ScreenPermissionScreen() {
                             const isLocked = role.points <= currentUserRolePoints;
 
                             return (
-                              <td key={role.id} className="py-3.5 px-4 sm:px-6 text-center">
+                              <td key={role.id} className="py-2 px-3 text-center">
                                 <div className="flex justify-center items-center">
                                   <button
                                     type="button"

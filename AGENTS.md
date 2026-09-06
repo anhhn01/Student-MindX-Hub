@@ -51,6 +51,34 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
     - **Lọc thô triệt để ca Makeup**: Tự động loại bỏ 100% các ca có `type` liên quan đến dạy bù (`MAKEUP`, `MAKE_UP`, `BÙ`, `BU`).
     - **Tính năng sao chép ảnh theo từng cơ sở & toàn bộ cơ sở**: Dưới mỗi tên cơ sở có nút "Sao chép ảnh" lưu thẳng Clipboard để dán nhanh (Ctrl+V) vào nhóm Zalo. **Chỉ hiển thị nút sao chép đối với các cơ sở có ca trải nghiệm**. Nút sao chép toàn bộ cơ sở nằm trên thanh công cụ trên cùng.
     - **Bắt buộc bọc bằng AppLayout**: Màn hình lịch trải nghiệm phải kế thừa `AppLayout` đầy đủ Sidebar bên trái, Header người dùng bên trên và Footer thông tin hệ thống bên dưới.
+18. **Quy Chuẩn Tài Khoản Kiểm Thử Chính Thức (Official Test Accounts Standard)**:
+    - Khi thực hiện kiểm thử tự động, kiểm tra giao diện hay kiểm thử API, Agent **bắt buộc sử dụng bộ tài khoản chính thức sau, tuyệt đối không nhập lan man**:
+      - **Admin**: `admin` / `Nh@t@nh12@8` (Sở hữu đầy đủ 101 cơ sở trực thuộc và toàn quyền quản trị).
+      - **Teacher Full-time**: `anhhn01` / `Nh@t@nh12@8` (Thuộc 4 cơ sở trực thuộc và phân quyền full-time).
+      - **Teacher Part-time**: `huynhnhatanh` / `Nh@t@nh12@8` (Thuộc 4 cơ sở trực thuộc và phân quyền part-time).
+19. **Cơ Chế Bảo Mật JWT & Tùy Chỉnh Thời Gian Duy Trì Tài Khoản (JWT Security & Session Expiration Standard)**:
+    - Secret key tạo JWT đặt tại `.env` với biến `JWT_SECRET=student-mindx-hub`.
+    - Token định danh `smh_token` được ký thuật toán `HS256` qua thư viện `jose`, lưu trong HttpOnly cookie an toàn.
+    - **Thời gian duy trì tài khoản (Session Maintenance)**: Mặc định hết hạn sau **7 ngày**, người dùng có thể chủ động tùy chỉnh từ **1 ngày đến tối đa 30 ngày** tại trang cài đặt cá nhân (`/profile`). Khi token hết hạn, Middleware tự động xóa phiên và đẩy về trang đăng nhập (`/login?redirect=...&reason=expired`).
+20. **Danh Mục 101 Cơ Sở LMS & Tiêu Chuẩn Xuất Ảnh Lịch Trải Nghiệm Không Bị Đen (LMS Centres & Zero-Black Export Standard)**:
+    - Hệ thống áp dụng danh mục đầy đủ **101 cơ sở chính thống** từ MindX LMS GraphQL (`OFFICIAL_LMS_CENTRES`), tài khoản `admin` được gán toàn bộ 101 cơ sở này để kiểm tra toàn hệ thống.
+    - Vùng xuất ảnh sao chép lịch trải nghiệm (cả từng cơ sở và toàn bộ cơ sở) phải được cô lập trong wrapper tọa độ riêng biệt, đảm bảo thẻ được chụp luôn giữ tọa độ `left: 0; position: relative` và tính toán `scrollHeight` đầy đủ để triệt tiêu 100% hiện tượng ảnh xuất ra bị đen hoặc mất nội dung. Ảnh sao chép toàn bộ cơ sở bắt buộc có banner tiêu đề tổng thể nổi bật.
+21. **Quy Chuẩn Ràng Buộc Dữ Liệu & Xác Thực Toàn Hệ Thống (Comprehensive Data Validation & Constraints Standard)**:
+    - **Cài đặt duy trì phiên (`token_expiry_days`)**: Bắt buộc là số nguyên trong khoảng $1 \le \text{ngày} \le 30$. Mặc định 7 ngày. Trang cá nhân trang bị 4 nút chọn nhanh: `1 ngày (Tối thiểu)`, `7 ngày (Mặc định)`, `14 ngày`, `30 ngày (Tối đa)`. Cả Client và Server đều kiểm tra chặt chẽ, chặn nhập số âm, số 0, số thập phân hoặc giá trị lớn hơn 30.
+    - **Hồ sơ cá nhân (`/profile`)**:
+      - `full_name`: Bắt buộc, độ dài từ 2 đến 70 ký tự, tự động trim khoảng trắng thừa.
+      - `password`: Khóa 100% đối với tài khoản LMS (`is_firebase = true`). Tài khoản nội bộ yêu cầu từ 6 đến 50 ký tự, kiểm tra trùng khớp xác nhận mật khẩu và có thanh đo độ mạnh mật khẩu trực quan.
+      - `lms_code` & `email`: Khóa cố định (`disabled` / read-only), không cho phép tự ý chỉnh sửa.
+    - **Phân cấp vai trò & quyền hạn (Role Hierarchy Scope)**: Tuyệt đối khóa quyền tự thay đổi vai trò, tự đổi trạng thái, tự xóa tài khoản của chính mình và của các tài khoản có cấp bậc bằng hoặc cao hơn mình (`targetRolePoints <= currentUserRolePoints`).
+22. **Quy Chuẩn Quy Trình Đẩy Code Git (Git Push Workflow Standard)**:
+    - Khi người dùng yêu cầu push code lên Git, Agent **bắt buộc tuân thủ đúng trình tự các bước sau**:
+      1. Rà soát `.gitignore` và loại bỏ triệt để các file nhạy cảm, file tạm thời, file rác/scratch.
+      2. Chạy kiểm tra bản build: `npm run build` (đảm bảo biên dịch thành công, không có lỗi runtime/build).
+      3. Thêm các thay đổi vào stage: `git add .`
+      4. Kéo cập nhật mới nhất từ nhánh đích: `git pull origin preview`
+      5. Xử lý conflict (nếu có) cẩn thận, đảm bảo tính toàn vẹn của code.
+      6. Tạo commit với thông điệp bằng tiếng Anh mô tả rõ chức năng chính và các thay đổi kèm theo (`git commit -m "<Main Feature>: <Detailed changes in English>"`).
+      7. Đẩy code lên remote: `git push origin preview`.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
