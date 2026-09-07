@@ -11,6 +11,9 @@ export const API_ROUTES = {
     LOGIN: "/api/auth/login",
     LOGOUT: "/api/auth/logout",
     ME: "/api/auth/me",
+    GOOGLE_URL: "/api/auth/google/url",
+    GOOGLE_CALLBACK: "/api/auth/google/callback",
+    CONNECT_GOOGLE_DRIVE: "/connect-google-drive",
   },
   ADMIN: {
     USERS: "/api/admin/users",
@@ -25,6 +28,9 @@ export const API_ROUTES = {
     USER_CENTRES_DETAIL: (userId: string) => `/api/admin/user-centres/${userId}`,
     // API Lịch trải nghiệm
     OFFICE_HOURS: "/api/office-hours",
+    // API & Màn hình bảo trì hệ thống
+    MAINTENANCE: "/api/admin/maintenance",
+    MAINTENANCE_SCREEN: "/admin/system-management/maintenance",
     // Quy tắc mới: /[role]/[main_menu]/[menu]
     PERMISSIONS_SCREEN: "/admin/system-management/screen_permission",
     USERS_SCREEN: "/admin/system-management/users",

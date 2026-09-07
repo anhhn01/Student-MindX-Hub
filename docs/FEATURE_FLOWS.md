@@ -165,14 +165,14 @@ sequenceDiagram
 ## 4. Luồng Kiểm Tra Phiên & Đăng Xuất (Session & Logout Flow)
 
 ### 4.1 Kiểm tra thông tin phiên (`/api/auth/me`):
-- Kiểm tra cookie `id_token`. Nếu không có -> trả về `401 { authenticated: false }`.
-- Nếu có token -> giải mã `user_name` từ cookie và trả về `{ authenticated: true, user: { name } }`.
+- Kiểm tra cookie `smh_token` hoặc `id_token`. Nếu không có -> trả về `401 { authenticated: false }`.
+- Nếu có token -> truy vấn thông tin người dùng từ Supabase Database theo thời gian thực (Real-time) và trả về `{ authenticated: true, user: { id, name, role, permissions } }`.
 
 ### 4.2 Đăng xuất (`/api/auth/logout`):
-- Gọi từ component `components/LogoutButton.tsx`.
+- Được gọi từ component Header User Profile Dropdown (`components/layout/AppLayout.tsx`) hoặc `components/LogoutButton.tsx`.
 - Gửi yêu cầu `POST /api/auth/logout`.
-- API thực hiện xóa bỏ các cookies: `id_token`, `refresh_token`, `user_name`, `user_role`, `user_id`.
-- Client chuyển hướng về `/login`.
+- API thực hiện xóa bỏ sạch toàn bộ 7 cookies xác thực và phân quyền: `smh_token`, `id_token`, `refresh_token`, `user_id`, `user_name`, `user_role`, `user_permissions` (set `maxAge: 0` và `expires: Thu, 01 Jan 1970 00:00:00 UTC`).
+- Client đồng thời xóa các cookie non-HttpOnly và thực hiện chuyển hướng cứng (`window.location.href = "/login"`) nhằm làm sạch toàn bộ cache bộ nhớ và React State, tránh tình trạng Middleware tự điều hướng ngược vào Dashboard do cookie cũ sót lại.
 
 ---
 
@@ -602,11 +602,10 @@ sequenceDiagram
    - `name`: Tên đầy đủ người dùng.
    - `role`: Tên vai trò (chữ).
    - `status`: Trạng thái người dùng (chữ).
-   - `expiryDays`: Số ngày duy trì phiên đăng nhập (1 - 30 ngày).
-4. **Thời Hạn Duy Trì Phiên**:
-   - **Mặc định**: 7 ngày (`7d`).
-   - **Phạm vi cho phép**: 1 ngày $\le$ `expiryDays` $\le$ 30 ngày.
-   - **Cấu hình người dùng**: Có thể điều chỉnh trực tiếp tại trang Hồ sơ cá nhân (`/profile`). Khi lưu, hệ thống tự động cập nhật thời hạn mới và cấp lại `smh_token` tương ứng.
+   - `expiryDays`: Số ngày duy trì phiên đăng nhập (cố định 30 ngày).
+4. **Thời Hạn Duy Trì Phiên Cố Định**:
+   - **Thời gian cố định**: 30 ngày (`30d`).
+   - Token định danh `smh_token` và các cookie người dùng (`user_id`, `user_name`, `user_role`) được cấp thời hạn sống `maxAge = 30 * 24 * 60 * 60 = 2,592,000` giây.
 
 ### 12.2 Cơ Chế Kiểm Tra Hết Hạn & Đẩy Về Đăng Nhập
 1. **Tại Middleware (`middleware.ts`)**:
@@ -616,20 +615,38 @@ sequenceDiagram
      * Middleware xóa toàn bộ cookie xác thực (`smh_token`, `id_token`, `refresh_token`, `user_id`, `user_name`, `user_role`, `user_permissions`).
      * Tự động chuyển hướng người dùng về trang đăng nhập với thông số: `/login?redirect=[targetPath]&reason=expired`.
 
-### 12.3 Giao Diện Cài Đặt & Ràng Buộc Dữ Liệu Tại Trang Cá Nhân (`/profile`)
-1. **Bộ Phím Tắt Nhanh (Preset Buttons)**:
-   - `1 ngày (Tối thiểu)`: Phiên đăng nhập ngắn, tăng tính bảo mật cho thiết bị công cộng.
-   - `7 ngày (Mặc định)`: Cân bằng tối ưu giữa tiện lợi và bảo mật.
-   - `14 ngày`: Duy trì 2 tuần cho người dùng thường xuyên.
-   - `30 ngày (Tối đa)`: Thời hạn tối đa theo quy định hệ thống.
-2. **Thanh Trượt Kéo (Range Slider) & Ô Nhập Trực Tiếp (Number Input)**:
-   - Đồng bộ song song 2 chiều giữa thanh trượt và ô số.
-   - Giới hạn cứng `min={1}`, `max={30}`, `step={1}`.
-   - Chặn ký tự phi số, số âm, số thập phân (`onKeyDown` loại trừ `-`, `+`, `e`, `.`).
-   - Hiển thị banner tính toán trực tiếp: `"Hiệu lực: {days} ngày ({days * 24} giờ)"`.
-3. **Ràng Buộc Họ Tên & Mật Khẩu**:
-   - Họ tên: Bắt buộc từ 2 đến 70 ký tự, hiển thị bộ đếm ký tự trực quan.
-   - Đổi mật khẩu: Khóa với tài khoản LMS; tài khoản nội bộ yêu cầu 6 - 50 ký tự, tích hợp thanh đo độ mạnh mật khẩu và kiểm tra trùng khớp xác nhận.
+### 12.3 Chuẩn Gợi Ý Đăng Nhập & Chống Tự Động Điền Trên Form (`/login`)
+1. **Gợi ý tài khoản đã lưu (Browser Autofill Suggestions)**:
+   - Input định danh sử dụng chuẩn `name="username"`, `id="username"`, `autoComplete="username"`.
+   - Input mật khẩu sử dụng chuẩn `name="password"`, `id="password"`, `autoComplete="current-password"`.
+2. **Cơ chế chống tự điền ban đầu (Anti-Initial-Autofill)**:
+   - Các trường nhập liệu được gắn cờ `readOnly` trong khoảnh khắc tải trang ban đầu để ngăn chặn trình duyệt tự động điền đè dữ liệu lên giao diện.
+   - Khi người dùng nhấp chuột hoặc chạm vào ô nhập liệu (`onFocus`, `onMouseDown`, `onTouchStart`), thuộc tính `readOnly` tự động được gỡ bỏ, kích hoạt ngay lập tức menu gợi ý các tài khoản đã lưu trên trình duyệt để chọn đăng nhập nhanh.
+
+### 12.4 Quy Chuẩn Quản Lý & Chỉnh Sửa Thông Tin Cá Nhân (`/profile`)
+1. **Phân biệt Nguồn tài khoản chuẩn xác**:
+   - Hệ thống căn cứ vào `password_hash === 'LMS_EXTERNAL_ACCOUNT'`:
+     * Nếu đúng -> Xác định là **Tài khoản LMS** (`is_firebase = true`, icon ngọn lửa tím).
+     * Nếu không -> Xác định là **Do website tạo** (`is_firebase = false`, icon xanh lá).
+2. **Quy tắc chỉnh sửa Họ và tên (`full_name`)**:
+   - **Tài khoản LMS**:
+     * Nếu hệ thống LMS MindX đã có thông tin họ tên (`lmsResult.fullName` có giá trị): Khóa cố định 100% (`disabled` / read-only), không cho phép chỉnh sửa, hiển thị huy hiệu `(Cố định từ LMS)`.
+     * Nếu tài khoản LMS nhưng chưa có thông tin họ tên trên LMS: Cho phép người dùng tự cập nhật họ tên vào hệ thống (ràng buộc 2 - 70 ký tự).
+   - **Tài khoản do website tạo**: Luôn được quyền chỉnh sửa họ và tên tự do (ràng buộc 2 - 70 ký tự).
+3. **Quy tắc Mã LMS (`lms_code`) & Email**:
+   - Khóa cố định 100% (`disabled` / read-only) cho mọi tài khoản, tuyệt đối không được chỉnh sửa.
+4. **Quy tắc Đổi mật khẩu**:
+   - **Mật khẩu chỉ được thay đổi khi là tài khoản do website cấp** (tài khoản nội bộ, ràng buộc 6 - 50 ký tự, có đo độ mạnh trực quan và kiểm tra trùng khớp xác nhận).
+### 12.5 Badge Nổi Hiển Thị Lượt Truy Cập Trang Web (`FloatingVisitBadge`)
+1. **Kiến trúc & Vị trí hiển thị**:
+   - Được gắn ở tầng gốc ứng dụng `app/layout.tsx` (bên trong `ThemeProvider`), tự động hiển thị nổi trên toàn bộ các trang (Trang chủ, Đăng nhập, Dashboard các vai trò, Profile, Quản lý, v.v.).
+   - Vị trí nổi cố định: `fixed top-[72px] right-3 sm:top-[76px] sm:right-6 z-40`. Vị trí này hoàn toàn tách biệt ngoài thanh Header (chiều cao 64px) để không che khuất cụm nút ThemeToggle và Avatar Dropdown.
+2. **Hiệu ứng trực quan**:
+   - **Chấm xanh nhấp nháy (Pulsing Green Dot)**: Sử dụng kỹ thuật Tailwind `relative flex h-2 w-2` với vòng xung nhịp ngoài `animate-ping bg-emerald-400 opacity-75` và nhân trong `bg-emerald-500` tạo cảm giác hệ thống đang trực tiếp hoạt động (live).
+   - **Thiết kế Glassmorphism**: Nền trắng mờ / đen mờ `bg-white/90 dark:bg-[#0B0F17]/90 backdrop-blur-md`, bo tròn con nhộng (`rounded-full`), viền mờ tinh tế, đổ bóng nhẹ nhàng và phóng nhẹ khi di chuột (`hover:scale-105`).
+3. **Cơ chế dữ liệu**:
+   - Lấy dữ liệu lượt truy cập toàn trang (`total_visits_global`) từ API `/api/dashboard/stats`.
+   - Kết hợp đọc/ghi tệp lưu trữ bền vững `data/site_stats.json` để bảo toàn số lượt truy cập qua các lần khởi động lại server.
 
 ---
 
@@ -661,5 +678,150 @@ Do gói Vercel Hobby (Free) không hỗ trợ Webhook gửi ra ngoài, hệ th�
    - Gọi API Telegram: `https://api.telegram.org/bot${token}/sendMessage`.
    - Đọc cấu hình bảo mật `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID` từ biến môi trường.
    - Định dạng tin nhắn HTML trực quan, vô hiệu hóa xem trước link (`disable_web_page_preview: true`).
+
+---
+
+## 15. Luồng Chế Độ Bảo Trì Hệ Thống (Maintenance Mode Flow)
+
+### 15.1 Nguyên Tắc Vận Hành
+1. **Phạm vi kiểm soát & Màn hình bảo trì xuất hiện đầu tiên**:
+   - Chỉ tài khoản Quản trị viên (Admin) mới có quyền truy cập màn hình cấu hình tại `/[role]/system-management/maintenance` và gọi API `POST /api/admin/maintenance`.
+   - **Màn hình bảo trì xuất hiện đầu tiên và cố định liên tục**: Khi bảo trì được bật (`isEnabled = true`), toàn bộ người dùng (kể cả khách vãng lai truy cập Trang chủ `/` hay truy cập `/login` thông thường) đều bị Middleware chuyển hướng ngay lập tức về trang `/maintenance` và lưu lại ở đó liên tục cho đến khi bảo trì kết thúc. Tuyệt đối không chỉ hiển thị một thông báo rồi cho ở lại trang khác.
+   - **Kênh đăng nhập đặc thù cho Quản trị viên**: Trên trang `/maintenance`, có nút "Quản trị viên đăng nhập" dẫn đến `/login?admin=1`. Chỉ đường dẫn này mới cho phép mở form đăng nhập để Admin xác thực. Nếu tài khoản không phải Admin (như Teacher) cố tình đăng nhập trong thời gian này, API `/api/auth/login` sẽ từ chối với mã lỗi 503 và giao diện tự động điều hướng người dùng quay trở lại ngay màn hình `/maintenance`.
+2. **Thời gian dự kiến tự động (3 tiếng mặc định)**:
+   - Form cho phép Admin chọn ngày giờ kết thúc mong muốn (`datetime-local`).
+   - Nếu Admin không nhập ngày giờ hoặc để trống, hệ thống **tự động thiết lập thời gian hoàn tất là 3 tiếng kể từ thời điểm kích hoạt**.
+   - Hỗ trợ các nút chọn nhanh: Mặc định (+3 tiếng), +1 tiếng, +6 tiếng, +12 tiếng.
+   - Khi thời gian dự kiến trôi qua (`Date.now() >= endTimestamp`), hệ thống tự động nhận diện bảo trì đã kết thúc và mở lại quyền truy cập bình thường.
+3. **Cách ly môi trường 100% (Local vs Production)**:
+   - Dữ liệu trạng thái được lưu trữ cục bộ tại `data/maintenance_status.json` (được bảo vệ trong `.gitignore` không đẩy lên Git).
+   - Việc kích hoạt bảo trì tại máy nội bộ (Local) hoàn toàn không làm gián đoạn hay ảnh hưởng đến máy chủ Production trên Vercel.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Người dùng (Guest / Teacher)
+    actor Admin as Quản Trị Viên (Admin)
+    participant MW as Next.js Middleware
+    participant Page as Màn Hình /maintenance
+    participant Login as Màn Hình /login?admin=1
+    participant AdminUI as Màn hình Bảo Trì Admin
+    participant Svc as Maintenance Service
+    participant JSON as data/maintenance_status.json
+
+    Admin->>AdminUI: Bật toggle bảo trì & (tùy chọn) chọn giờ kết thúc
+    AdminUI->>Svc: POST /api/admin/maintenance { isEnabled: true, expectedEndTime }
+    Note over Svc: Nếu không điền giờ: Mặc định = Now + 3 giờ
+    Svc->>JSON: Ghi trạng thái bảo trì & môi trường
+    Svc-->>AdminUI: Phản hồi thành công
+
+    User->>MW: Truy cập route bất kỳ (/, /login, /dashboard, /teacher-fulltime/...)
+    MW->>Svc: Kiểm tra trạng thái bảo trì
+    alt Người dùng đã xác thực là Admin
+        MW-->>Admin: Cho phép truy cập bình thường
+    else Người dùng là vai trò khác / khách
+        MW-->>User: Redirect 307 về /maintenance (Hiện lên đầu tiên và lưu lại liên tục)
+        User->>Page: Xem đồng hồ đếm ngược & thông điệp bảo trì
+        opt Admin cần đăng nhập quản trị
+            Admin->>Page: Nhấp nút "Quản trị viên đăng nhập"
+            Page->>Login: Điều hướng sang /login?admin=1
+            Login->>Admin: Nhập thông tin tài khoản admin và đăng nhập thành công
+        end
+    end
+```
+
+---
+
+## 16. Luồng Quản Lý Phiên Bản Hệ Thống & Cập Nhật Khi Đẩy Git (Single Version Changelog & Git Push Flow)
+
+### 16.1 Nguyên Tắc Hiển Thị Duy Nhất 1 Phiên Bản Mới Nhất
+1. **Nguồn chân lý duy nhất (Single Source of Truth)**:
+   - Toàn bộ thông tin phiên bản được định nghĩa tập trung tại `lib/constants/version.ts` qua hằng số `CURRENT_VERSION`.
+   - Bao gồm: Số hiệu (`version`), Ngày phát hành (`releaseDate`), Tiêu đề (`title`), Tóm tắt ngắn gọn (`summary`), và danh sách các chức năng chính (`features`).
+2. **Trang Nhật Ký Phát Hành (`/changelog`)**:
+   - **Chỉ hiển thị DUY NHẤT 1 phiên bản mới nhất**, tuyệt đối không hiển thị danh sách lịch sử dài dòng.
+   - Các tính năng được phân loại rõ ràng bằng nhãn trực quan: *Tính Năng Mới*, *Cải Tiến*, *Bảo Mật & Ổn Định*.
+   - Nội dung tóm tắt hướng tới người dùng cuối, ngắn gọn, súc tích, dễ hiểu và không dùng ngôn từ kỹ thuật quá chuyên môn.
+3. **Chân trang (SystemFooter)**:
+   - Hiển thị trực tiếp số hiệu phiên bản mới nhất (ví dụ: `Phiên bản v1.5`) liên kết trực tiếp tới `/changelog`.
+   - Loại bỏ chữ `production` và loại bỏ huy hiệu trạng thái hệ thống trùng lặp.
+4. **Quy Tắc Bắt Buộc Khi Đẩy Code Lên Git**:
+   - Mỗi khi có tính năng/chức năng mới được chuẩn bị đẩy lên nhánh Git (`git push origin preview`), Agent **BẮT BUỘC** phải:
+     1. Tăng số hiệu phiên bản theo định dạng `vx.x` (ví dụ `v1.5` -> `v1.6`).
+     2. Cập nhật ngày phát hành và bổ sung tóm tắt tính năng mới vào `lib/constants/version.ts`.
+     3. Tiến hành kiểm tra `npm run build` trước khi `git add .` và `git push`.
+
+---
+
+## 17. Luồng Điều Hướng Trang Chủ & Phân Biệt Sidebar Bảng Điều Khiển (Home & Dashboard Isolation Flow)
+
+### 17.1 Cơ Chế Ẩn/Hiện Menu Sidebar Giữa Trang Chủ Và Dashboard
+1. **Khi đang ở Trang chủ (`/`)**:
+   - Giao diện kế thừa `AppLayout` với Sidebar thu gọn và Header Dropdown đồng nhất.
+   - **Cách ly menu hoàn toàn**: Toàn bộ các nhóm menu nghiệp vụ của Dashboard (*QUẢN LÝ HỆ THỐNG*, *KIỂM TRA DỮ LIỆU*, v.v.) đều bị ẩn đi.
+   - Sidebar chỉ hiển thị **DUY NHẤT một nút "Về Bảng điều khiển"** (`/[role]/dashboard`).
+2. **Khi ở Dashboard hoặc các màn hình quản lý (`pathname !== "/"` )**:
+   - Sidebar hiển thị đầy đủ các nhóm menu nghiệp vụ theo phân quyền vai trò.
+   - Nhóm *TỔNG QUAN* có nút **"Xem trang chủ"** (`/`) để chuyển nhanh ra Trang chủ và nút **"Bảng điều khiển"** (`/[role]/dashboard`).
+
+### 17.2 Quy Chuẩn Vị Trí Badge Lượt Truy Cập & Nhận Diện Thương Hiệu Logo
+1. **Badge Nổi Lượt Truy Cập**:
+   - Neo cố định tại `fixed bottom-16 right-3 sm:bottom-20 sm:right-6 z-40`, đảm bảo bay lơ lửng an toàn phía trên Chân trang (Footer), tuyệt đối không che khuất thông tin bản quyền và phiên bản hệ thống.
+2. **Logo SMH**:
+   - Loại bỏ huy hiệu `Hub` gắn cạnh chữ `SMH` trong component `SMHLogo`, vì chữ `H` trong `SMH` vốn dĩ đã là `Hub`.
+3. **Thanh Cuộn Sleek Custom Scrollbar**:
+   - Không sử dụng thanh cuộn mặc định thô cứng của hệ điều hành.
+   - Áp dụng thanh cuộn tinh gọn (width 7px, bo tròn pill `rounded-full`, track trong suốt, thumb màu trung tính mờ nhẹ, hiệu ứng chuyển màu Crimson/Ruby khi rê chuột, hỗ trợ đầy đủ cả chế độ Sáng và Tối).
+
+---
+
+## 18. Luồng Bắt Buộc Liên Kết Google Drive Cho Teacher Part-Time (Mandatory Google Drive OAuth Flow)
+
+### 18.1 Mục Đích & Điều Kiện Kích Hoạt
+1. **Đối tượng áp dụng**: Tài khoản có vai trò `Teacher Part-time` (chứa `part-time` hoặc `parttime`).
+2. **Điều kiện kích hoạt**: Thuộc tính `email` trong bảng `users` tại cơ sở dữ liệu Supabase đang để trống (`NULL` hoặc rỗng `""`).
+3. **Hành vi cưỡng chế (Strict Enforcement)**:
+   - Khi tài khoản đăng nhập thành công qua `/api/auth/login`, hệ thống phát hiện email trống và trả về `requires_google_drive: true` kèm `redirect_url: "/connect-google-drive"`.
+   - Tại tầng **Middleware (`middleware.ts`)**: Mọi yêu cầu truy cập đến bất kỳ route nào (Dashboard, Trang chủ, Quản lý...) từ tài khoản này đều bị tự động chặn lại và chuyển hướng (Redirect 307) về màn hình `/connect-google-drive`.
+   - Các ngoại lệ duy nhất được phép đi qua: `/connect-google-drive`, `/api/auth/google/*`, `/api/auth/logout`, `/login`, tài nguyên tĩnh `/_next` và favicon.
+
+### 18.2 Chi Tiết Luồng Tương Tác Google OAuth
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Teacher as Teacher Part-time (email: null)
+    participant LoginUI as /login
+    participant MW as Middleware
+    participant ConnectUI as /connect-google-drive
+    participant GoogleAuth as Google OAuth 2.0
+    participant Callback as /api/auth/google/callback
+    participant DB as Supabase users
+    participant JSON as data/google_drive_tokens.json
+
+    Teacher->>LoginUI: Đăng nhập bằng huynhnhatanh / password
+    LoginUI->>ConnectUI: Điều hướng sang /connect-google-drive (do email = null)
+    Teacher->>ConnectUI: Xem thông tin tài khoản & nhấn "Liên kết với Google Drive"
+    ConnectUI->>GoogleAuth: Chuyển hướng tới màn hình cấp quyền Google
+    Teacher->>GoogleAuth: Cấp quyền truy cập Google Drive & Email
+    GoogleAuth->>Callback: Redirect về /api/auth/google/callback?code=...
+    Callback->>GoogleAuth: Gửi POST đổi code lấy tokens
+    Callback->>GoogleAuth: Gọi /oauth2/v2/userinfo lấy googleEmail
+    Callback->>DB: UPDATE users SET email = googleEmail, updated_at = NOW()
+    Callback->>JSON: Lưu access_token & refresh_token theo userId
+    Callback->>Callback: Ký lại SMH JWT Token mới có chứa email
+    Callback-->>Teacher: Điều hướng về /teacher-parttime/dashboard?connected=drive_success
+    Teacher->>MW: Truy cập Dashboard
+    MW-->>Teacher: Cho phép truy cập bình thường (email đã tồn tại)
+```
+
+### 18.3 Cấu Hình Biến Môi Trường (DUY NHẤT trong `.env`)
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+```
+- Khi quản trị viên chưa điền khóa vào `.env`, màn hình `/connect-google-drive` hiển thị thông báo hướng dẫn rõ ràng và vô hiệu hóa nút liên kết một cách an toàn.
+
+
 
 

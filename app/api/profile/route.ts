@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
-import { getUserTokenExpiryDays, setUserTokenExpiryDays } from "@/lib/auth/token-settings";
 import { signSmhToken } from "@/lib/auth/jwt";
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -26,25 +25,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let { data: userData, error } = await supabase
+    const { data: userData, error } = await supabase
       .from("users")
       .select(
-        "id, full_name, email, lms_code, is_firebase, created_at, roles ( name ), user_statuses ( name )"
+        "id, full_name, email, lms_code, password_hash, created_at, roles ( name ), user_statuses ( name )"
       )
       .eq("id", userId)
       .single();
-
-    if (error && error.message?.includes("is_firebase")) {
-      const fallback = await supabase
-        .from("users")
-        .select(
-          "id, full_name, email, lms_code, created_at, roles ( name ), user_statuses ( name )"
-        )
-        .eq("id", userId)
-        .single();
-      userData = fallback.data ? { ...fallback.data, is_firebase: false } : null;
-      error = fallback.error;
-    }
 
     if (error || !userData) {
       return NextResponse.json(
@@ -52,6 +39,11 @@ export async function GET(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Phân loại tài khoản chuẩn xác: nếu password_hash là LMS_EXTERNAL_ACCOUNT -> Tài khoản LMS
+    const isFirebase =
+      userData.password_hash === "LMS_EXTERNAL_ACCOUNT" ||
+      (userData as any).is_firebase === true;
 
     const roleRelation = userData.roles;
     const roleObj = Array.isArray(roleRelation) ? roleRelation[0] : roleRelation;
@@ -61,21 +53,54 @@ export async function GET(request: NextRequest) {
     const statusObj = Array.isArray(statusRelation) ? statusRelation[0] : statusRelation;
     const statusName = (statusObj as any)?.name || "Đã phê duyệt";
 
-    // Lấy cấu hình thời hạn duy trì tài khoản (mặc định 7, tối đa 30 ngày)
-    const tokenExpiryDays = getUserTokenExpiryDays(userData.id, userData.lms_code);
+    let canEditName = true;
+    let nameMessage = "";
+    let effectiveFullName = (userData.full_name || "").trim();
+
+    if (isFirebase) {
+      try {
+        const { checkLmsAccount } = await import("@/lib/services/lms-service");
+        const lmsResult = await checkLmsAccount(userData.lms_code);
+        if (lmsResult.exists && lmsResult.fullName && lmsResult.fullName.trim().length > 0) {
+          canEditName = false;
+          effectiveFullName = lmsResult.fullName.trim();
+          nameMessage = "Họ và tên được đồng bộ cố định từ hệ thống LMS MindX.";
+        } else {
+          // LMS không có thông tin về họ tên -> người dùng có quyền chỉnh sửa
+          canEditName = true;
+          nameMessage = "Tài khoản LMS chưa có họ tên trên hệ thống LMS, bạn có quyền tự cập nhật họ và tên.";
+        }
+      } catch (err) {
+        console.warn("Lỗi kiểm tra LMS trong GET profile:", err);
+        if (effectiveFullName.length > 0 && effectiveFullName !== userData.lms_code) {
+          canEditName = false;
+          nameMessage = "Họ và tên được đồng bộ cố định từ hệ thống LMS MindX.";
+        } else {
+          canEditName = true;
+          nameMessage = "Tài khoản LMS chưa có họ tên trên hệ thống LMS, bạn có quyền tự cập nhật họ và tên.";
+        }
+      }
+    } else {
+      // Do website tạo -> luôn được quyền sửa họ tên
+      canEditName = true;
+      nameMessage = "Tài khoản nội bộ, có thể chỉnh sửa họ và tên.";
+    }
 
     return NextResponse.json({
       success: true,
       user: {
         id: userData.id,
-        full_name: userData.full_name || "",
+        full_name: effectiveFullName,
         email: userData.email || "",
         lms_code: userData.lms_code || "",
-        is_firebase: !!userData.is_firebase,
-        account_source: userData.is_firebase ? "Tài khoản LMS" : "Do website tạo",
+        is_firebase: isFirebase,
+        account_source: isFirebase ? "Tài khoản LMS" : "Do website tạo",
+        can_edit_name: canEditName,
+        can_edit_password: !isFirebase,
+        name_message: nameMessage,
         role: roleName,
         status: statusName,
-        token_expiry_days: tokenExpiryDays,
+        token_expiry_days: 30,
         created_at: userData.created_at,
       },
     });
@@ -100,12 +125,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { full_name, password, token_expiry_days } = body;
+    const { full_name, password } = body;
 
-    // Kiểm tra thông tin tài khoản hiện tại
+    // Kiểm tra thông tin tài khoản hiện tại từ Supabase
     const { data: targetUser, error: fetchErr } = await supabase
       .from("users")
-      .select("id, is_firebase, full_name, lms_code, roles(name), user_statuses(name)")
+      .select("id, full_name, lms_code, password_hash, roles(name), user_statuses(name)")
       .eq("id", userId)
       .single();
 
@@ -116,9 +141,13 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const isFirebase =
+      targetUser.password_hash === "LMS_EXTERNAL_ACCOUNT" ||
+      (targetUser as any).is_firebase === true;
+
     const updateData: Record<string, any> = {};
 
-    // 1. Ràng buộc họ tên: bắt buộc 2 - 70 ký tự, không được chỉ chứa khoảng trắng
+    // 1. Xử lý Họ và tên
     if (full_name !== undefined) {
       const cleanName = full_name.trim();
       if (cleanName.length < 2 || cleanName.length > 70) {
@@ -127,16 +156,36 @@ export async function PATCH(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      // Nếu là tài khoản LMS: Kiểm tra xem LMS có thông tin họ tên không
+      if (isFirebase) {
+        try {
+          const { checkLmsAccount } = await import("@/lib/services/lms-service");
+          const lmsResult = await checkLmsAccount(targetUser.lms_code);
+          if (lmsResult.exists && lmsResult.fullName && lmsResult.fullName.trim().length > 0) {
+            return NextResponse.json(
+              {
+                error:
+                  "Họ và tên của tài khoản LMS được đồng bộ cố định từ LMS MindX, không thể chỉnh sửa.",
+              },
+              { status: 400 }
+            );
+          }
+        } catch (lmsCheckErr) {
+          console.warn("Lỗi kiểm tra quyền sửa họ tên LMS trong PATCH:", lmsCheckErr);
+        }
+      }
+
       updateData.full_name = cleanName;
     }
 
-    // 2. Ràng buộc mật khẩu: Khóa với LMS; Tài khoản nội bộ 6 - 50 ký tự
+    // 2. Xử lý Mật khẩu: Mật khẩu chỉ được thay đổi khi nó là tài khoản website cấp
     if (password !== undefined && password.trim().length > 0) {
-      if (targetUser.is_firebase) {
+      if (isFirebase) {
         return NextResponse.json(
           {
             error:
-              "Tài khoản từ hệ thống LMS xác thực bằng mật khẩu LMS, không thể đổi mật khẩu tại đây.",
+              "Mật khẩu chỉ được thay đổi khi là tài khoản do website cấp. Tài khoản LMS xác thực trực tiếp qua hệ thống LMS MindX.",
           },
           { status: 400 }
         );
@@ -151,46 +200,26 @@ export async function PATCH(request: NextRequest) {
       updateData.password_hash = await bcrypt.hash(cleanPass, 10);
     }
 
-    // 3. Ràng buộc thời gian duy trì tài khoản: Số nguyên từ 1 đến 30 ngày
-    let updatedExpiryDays: number | null = null;
-    if (token_expiry_days !== undefined) {
-      const parsedDays = Math.round(Number(token_expiry_days));
-      if (isNaN(parsedDays) || parsedDays < 1 || parsedDays > 30) {
-        return NextResponse.json(
-          { error: "Thời gian duy trì tài khoản phải là số nguyên từ 1 đến 30 ngày." },
-          { status: 400 }
-        );
-      }
-      updatedExpiryDays = setUserTokenExpiryDays(
-        parsedDays,
-        userId,
-        targetUser.lms_code
-      );
-    }
-
-    if (Object.keys(updateData).length === 0 && updatedExpiryDays === null) {
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: "Không có thông tin nào được thay đổi" },
         { status: 400 }
       );
     }
 
-    if (Object.keys(updateData).length > 0) {
-      updateData.updated_at = new Date().toISOString();
-      const { error: updateErr } = await supabase
-        .from("users")
-        .update(updateData)
-        .eq("id", userId);
+    updateData.updated_at = new Date().toISOString();
+    const { error: updateErr } = await supabase
+      .from("users")
+      .update(updateData)
+      .eq("id", userId);
 
-      if (updateErr) {
-        return NextResponse.json(
-          { error: `Lỗi cập nhật: ${updateErr.message}` },
-          { status: 500 }
-        );
-      }
+    if (updateErr) {
+      return NextResponse.json(
+        { error: `Lỗi cập nhật: ${updateErr.message}` },
+        { status: 500 }
+      );
     }
 
-    const currentExpiry = updatedExpiryDays ?? getUserTokenExpiryDays(userId, targetUser.lms_code);
     const roleRel = targetUser.roles;
     const roleObj = Array.isArray(roleRel) ? roleRel[0] : roleRel;
     const roleName = (roleObj as any)?.name || "Admin";
@@ -199,7 +228,7 @@ export async function PATCH(request: NextRequest) {
     const statusObj = Array.isArray(statusRel) ? statusRel[0] : statusRel;
     const statusName = (statusObj as any)?.name || "Đã phê duyệt";
 
-    // Ký lại token với thời hạn mới và cập nhật cookies
+    // Ký lại token với thời hạn cố định 30 ngày và cập nhật cookies
     const { token: newSmhToken, maxAgeSeconds } = await signSmhToken(
       {
         userId: targetUser.id,
@@ -208,13 +237,13 @@ export async function PATCH(request: NextRequest) {
         role: roleName,
         status: statusName,
       },
-      currentExpiry
+      30
     );
 
     const res = NextResponse.json({
       success: true,
-      message: "Cập nhật thông tin cá nhân và thời gian duy trì tài khoản thành công",
-      token_expiry_days: currentExpiry,
+      message: "Cập nhật thông tin cá nhân thành công",
+      token_expiry_days: 30,
     });
 
     res.cookies.set("smh_token", newSmhToken, {

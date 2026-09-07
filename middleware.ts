@@ -11,17 +11,30 @@ export async function middleware(request: NextRequest) {
   // Xác thực qua SMH JWT Token (hoặc id_token dự phòng)
   let isAuthenticated = false;
   let isTokenExpired = false;
+  let userEmail = "";
 
   if (smhToken) {
     const result = await verifySmhToken(smhToken);
     if (result.valid) {
       isAuthenticated = true;
+      if (result.payload?.email) {
+        userEmail = result.payload.email.trim();
+      }
     } else if (result.expired) {
       isTokenExpired = true;
     }
   } else if (idToken) {
     isAuthenticated = true;
   }
+
+  // Tra cứu email dự phòng từ cookie nếu trong token chưa có
+  if (!userEmail) {
+    const rawEmail = request.cookies.get("user_email")?.value;
+    if (rawEmail) userEmail = decodeURIComponent(rawEmail).trim();
+  }
+
+  const isTeacherPartTime = userRole.includes("part-time") || userRole.includes("parttime");
+  const isPartTimeMissingEmail = isTeacherPartTime && (!userEmail || userEmail === "");
 
   // Xác định dashboard chuẩn dựa theo vai trò của người dùng
   const getRoleDashboard = (role: string) => {
@@ -31,9 +44,66 @@ export async function middleware(request: NextRequest) {
     return "/dashboard";
   };
 
-  // 1. Đã đăng nhập nhưng lại truy cập trang /login -> tự điều hướng về dashboard của vai trò đó
+  // 0. Kiểm tra chế độ bảo trì hệ thống (Chỉ Admin mới có quyền truy cập khi đang bảo trì)
+  if (
+    !pathname.startsWith("/maintenance") &&
+    !pathname.startsWith("/_next") &&
+    !pathname.startsWith("/api") &&
+    pathname !== "/favicon.ico"
+  ) {
+    const isAdmin = userRole.includes("admin");
+    if (!isAdmin) {
+      try {
+        const mRes = await fetch(new URL("/api/admin/maintenance", request.url), {
+          headers: { "x-internal-check": "1" },
+          cache: "no-store",
+        });
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          if (mData?.data?.isEnabled) {
+            // Khi bảo trì bật: Toàn bộ người dùng (kể cả vào /login thường) đều chuyển thẳng sang /maintenance.
+            // Chỉ ngoại lệ duy nhất khi Admin nhấp 'Quản trị viên đăng nhập' (/login?admin=1)
+            const isAdminLogin = pathname.startsWith("/login") && request.nextUrl.searchParams.get("admin") === "1";
+            if (!isAdminLogin) {
+              return NextResponse.redirect(new URL("/maintenance", request.url));
+            }
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 1. Đã đăng nhập nhưng lại truy cập trang /login -> tự điều hướng về dashboard (hoặc connect-google-drive nếu thiếu email)
   if (isAuthenticated && pathname.startsWith("/login")) {
+    if (isPartTimeMissingEmail) {
+      return NextResponse.redirect(new URL("/connect-google-drive", request.url));
+    }
     return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
+  }
+
+  // 1.5 BẮT BUỘC OAUTH GOOGLE DRIVE: Teacher Part-time mà email đang trống bắt buộc phải liên kết trước khi truy cập bất kỳ route nào khác
+  if (isAuthenticated && isPartTimeMissingEmail) {
+    const isAllowedOAuthPath =
+      pathname.startsWith("/connect-google-drive") ||
+      pathname.startsWith("/api/auth/google") ||
+      pathname.startsWith("/api/auth/logout") ||
+      pathname.startsWith("/api/auth/me") ||
+      pathname.startsWith("/_next") ||
+      pathname === "/favicon.ico";
+
+    if (!isAllowedOAuthPath) {
+      return NextResponse.redirect(new URL("/connect-google-drive", request.url));
+    }
+  }
+
+  // Nếu tài khoản đã có email hợp lệ mà vẫn vào /connect-google-drive -> Điều hướng về dashboard
+  if (isAuthenticated && !isPartTimeMissingEmail && pathname.startsWith("/connect-google-drive")) {
+    return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
+  }
+
+  // Chưa đăng nhập nhưng cố truy cập /connect-google-drive -> Về /login
+  if (!isAuthenticated && pathname.startsWith("/connect-google-drive")) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   // Danh sách các route cần xác thực đăng nhập
@@ -59,6 +129,7 @@ export async function middleware(request: NextRequest) {
     response.cookies.delete("user_id");
     response.cookies.delete("user_name");
     response.cookies.delete("user_role");
+    response.cookies.delete("user_email");
     response.cookies.delete("user_permissions");
     return response;
   }
@@ -141,6 +212,8 @@ export const config = {
     "/teacher-parttime/:path*",
     "/profile/:path*",
     "/dashboard/:path*",
+    "/connect-google-drive",
     "/login",
+    "/",
   ],
 };

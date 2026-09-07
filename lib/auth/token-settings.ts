@@ -34,9 +34,7 @@ function writeSettingsStore(store: Record<string, UserSettings>) {
 
 /**
  * Lấy số ngày hết hạn token của tài khoản:
- * - Mặc định: 7 ngày
- * - Tối thiểu: 1 ngày
- * - Tối đa: 30 ngày
+ * - Mặc định: 30 ngày
  */
 export function getUserTokenExpiryDays(
   userId?: string | null,
@@ -58,7 +56,7 @@ export function getUserTokenExpiryDays(
     }
   }
 
-  return 7;
+  return 30;
 }
 
 /**

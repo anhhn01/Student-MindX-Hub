@@ -10,6 +10,7 @@ export interface SmhJwtPayload {
   name: string;
   role: string;
   status: string;
+  email?: string;
   expiryDays: number;
 }
 
@@ -18,10 +19,10 @@ export interface SmhJwtPayload {
  */
 export async function signSmhToken(
   payload: Omit<SmhJwtPayload, "expiryDays">,
-  expiryDays: number = 7
+  expiryDays: number = 30
 ): Promise<{ token: string; expiryDays: number; maxAgeSeconds: number }> {
-  // Ràng buộc thời hạn token: 1 - 30 ngày (Mặc định 7 ngày)
-  const safeDays = Math.min(30, Math.max(1, Math.round(expiryDays || 7)));
+  // Thời hạn token mặc định 30 ngày (tối đa 30 ngày)
+  const safeDays = Math.min(30, Math.max(1, Math.round(expiryDays || 30)));
 
   const fullPayload: SmhJwtPayload = {
     ...payload,

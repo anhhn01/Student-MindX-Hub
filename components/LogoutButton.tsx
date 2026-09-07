@@ -13,13 +13,21 @@ export default function LogoutButton() {
       console.error("Logout error:", err);
     }
     
-    // Clear cookies on client side
-    document.cookie = "id_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    document.cookie = "refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    document.cookie = "user_name=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    // Clear all cookies on client side
+    const clientCookies = [
+      "user_id",
+      "user_name",
+      "user_role",
+      "user_permissions",
+      "id_token",
+      "refresh_token",
+      "smh_token",
+    ];
+    clientCookies.forEach((c) => {
+      document.cookie = `${c}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    });
 
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   };
 
   return (

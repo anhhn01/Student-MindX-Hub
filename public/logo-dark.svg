@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 160" width="620" height="160" fill="none">
+  <defs>
+    <linearGradient id="darkRed1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F43F5E" />
+      <stop offset="100%" stop-color="#E11D48" />
+    </linearGradient>
+    <linearGradient id="darkRed2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#BE123C" />
+      <stop offset="100%" stop-color="#9F1239" />
+    </linearGradient>
+    <linearGradient id="darkAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185" />
+      <stop offset="100%" stop-color="#E11D48" />
+    </linearGradient>
+    <linearGradient id="darkDeep" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#881337" />
+      <stop offset="100%" stop-color="#4C0519" />
+    </linearGradient>
+  </defs>
+
+  <!-- Left Emblem (120x120) -->
+  <g transform="translate(20, 20)">
+    <rect x="2" y="2" width="116" height="116" rx="28" fill="#0D1117" stroke="#E11D48" stroke-width="4" />
+    <g transform="translate(10, 10) scale(1)">
+      <!-- Top Left wing -->
+      <polygon points="24,20 46,20 34,46 16,36" fill="url(#darkRed1)" />
+      <!-- Top Right wing -->
+      <polygon points="76,20 54,20 66,46 84,36" fill="url(#darkAmber)" />
+      <!-- Center diamond core -->
+      <polygon points="50,38 64,50 50,62 36,50" fill="#FFFFFF" opacity="0.95" />
+      <polygon points="50,42 58,50 50,58 42,50" fill="url(#darkRed1)" />
+      <!-- Bottom Left wing -->
+      <polygon points="16,64 34,54 46,80 24,80" fill="url(#darkDeep)" />
+      <!-- Bottom Right wing -->
+      <polygon points="84,64 66,54 54,80 76,80" fill="url(#darkRed2)" />
+      <!-- Center dot -->
+      <circle cx="50" cy="50" r="3.5" fill="#FFFFFF" />
+    </g>
+  </g>
+
+  <!-- Right Typography for Dark Mode -->
+  <g transform="translate(160, 0)">
+    <text x="0" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="64" letter-spacing="-1">
+      <tspan fill="#FFFFFF">S</tspan><tspan fill="#F43F5E">M</tspan><tspan fill="#FFFFFF">H</tspan>
+    </text>
+    <text x="4" y="118" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="15" fill="#94A3B8" letter-spacing="3.5">
+      STUDENT MINDX HUB
+    </text>
+  </g>
+</svg>

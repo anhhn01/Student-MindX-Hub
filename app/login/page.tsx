@@ -1,21 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff, ShieldAlert, ShieldCheck, ArrowRight, Loader2, Info } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 import PublicHeader from "@/components/layout/PublicHeader";
 import SystemFooter from "@/components/layout/SystemFooter";
+import { SMHLogo } from "@/components/brand/SMHLogo";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isAdminLogin = searchParams.get("admin") === "1";
+
   const [lmsCode, setLmsCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
+  const [isReadyForAutofill, setIsReadyForAutofill] = useState(false);
+
+  const enableAutofill = () => {
+    if (!isReadyForAutofill) {
+      setIsReadyForAutofill(true);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +46,11 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 503) {
+          // Khi bảo trì đang bật và tài khoản không phải admin -> chuyển hướng ngay về trang bảo trì
+          router.push("/maintenance");
+          return;
+        }
         if (res.status === 403 || data.error?.includes("quyền truy cập")) {
           setIsAccessDenied(true);
         }
@@ -70,8 +86,8 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 my-auto relative z-10">
         <div className="w-full max-w-md bg-white/95 dark:bg-[#0B0F17]/90 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-6 sm:p-10 shadow-2xl relative">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-600 text-white shadow-xl shadow-rose-600/30 mb-4 ring-4 ring-rose-500/20">
-              <ShieldCheck className="w-7 h-7" />
+            <div className="inline-flex items-center justify-center mb-4">
+              <SMHLogo size="lg" showText={false} />
             </div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Đăng Nhập SMH
@@ -80,6 +96,19 @@ export default function LoginPage() {
               Hệ thống cổng thông tin đào tạo & quản trị MindX
             </p>
           </div>
+
+          {/* Admin Maintenance Banner */}
+          {isAdminLogin && (
+            <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-700 dark:text-amber-300">
+              <Info className="w-5 h-5 shrink-0 text-amber-500 mt-0.5" />
+              <div>
+                <p className="font-bold">Kênh Đăng Nhập Dành Riêng Cho Quản Trị Viên</p>
+                <p className="text-[11px] text-amber-600/90 dark:text-amber-400/90 mt-0.5">
+                  Hệ thống đang trong chế độ bảo trì. Chỉ tài khoản Quản trị viên mới được cấp quyền truy cập.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Error Banner */}
           {error && (
@@ -97,19 +126,20 @@ export default function LoginPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-            {/* Dummy hidden inputs chống autofill của trình duyệt */}
-            <input type="text" name="fake_user" style={{ display: "none" }} />
-            <input type="password" name="fake_pass" style={{ display: "none" }} />
-
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
+              <label htmlFor="username" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
                 Mã LMS / Tên Đăng Nhập
               </label>
               <input
                 type="text"
-                name="smh_lms_id"
-                autoComplete="off"
+                id="username"
+                name="username"
+                autoComplete="username"
+                readOnly={!isReadyForAutofill}
+                onFocus={enableAutofill}
+                onMouseDown={enableAutofill}
+                onTouchStart={enableAutofill}
                 value={lmsCode}
                 onChange={(e) => {
                   setLmsCode(e.target.value);
@@ -122,14 +152,19 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
+              <label htmlFor="password" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
                 Mật Khẩu
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  name="smh_user_secret"
-                  autoComplete="new-password"
+                  id="password"
+                  name="password"
+                  autoComplete="current-password"
+                  readOnly={!isReadyForAutofill}
+                  onFocus={enableAutofill}
+                  onMouseDown={enableAutofill}
+                  onTouchStart={enableAutofill}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -164,5 +199,19 @@ export default function LoginPage() {
       {/* FOOTER - ĐỒNG BỘ TRÊN MỌI GIAO DIỆN */}
       <SystemFooter />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#090D16]">
+          <div className="w-8 h-8 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -26,10 +26,14 @@ import {
   Building2,
   Database,
   CalendarCheck,
+  Wrench,
+  Home as HomeIcon,
+  ArrowRight,
 } from "lucide-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { API_ROUTES, getRoleSlug } from "@/lib/constants/api-routes";
 import SystemFooter from "@/components/layout/SystemFooter";
+import { SMHLogo } from "@/components/brand/SMHLogo";
 
 interface UserProfile {
   id?: string;
@@ -129,12 +133,26 @@ export default function AppLayout({
   const handleLogout = async () => {
     try {
       await fetch(API_ROUTES.AUTH.LOGOUT, { method: "POST" });
-      router.push("/login");
-      router.refresh();
     } catch (err) {
       console.error("Logout error:", err);
-      router.push("/login");
     }
+
+    // Xóa toàn bộ cookie phía Client (những cookie non-HttpOnly)
+    const clientCookies = [
+      "user_id",
+      "user_name",
+      "user_role",
+      "user_permissions",
+      "id_token",
+      "refresh_token",
+      "smh_token",
+    ];
+    clientCookies.forEach((c) => {
+      document.cookie = `${c}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    });
+
+    // Chuyển hướng cứng để xóa sạch mọi cache bộ nhớ và React state
+    window.location.href = "/login";
   };
 
   // Badge màu theo Role
@@ -220,6 +238,13 @@ export default function AppLayout({
       icon: Building2,
     });
   }
+  if (isAdmin) {
+    systemSubItems.push({
+      name: "Bảo trì hệ thống",
+      href: API_ROUTES.ADMIN.MAINTENANCE_SCREEN,
+      icon: Wrench,
+    });
+  }
 
   const dataInspectionSubItems = [];
   if (canSeeTrialSchedules) {
@@ -230,38 +255,33 @@ export default function AppLayout({
     });
   }
 
-  // Nav menu items
-  const menuItems = [
-    {
-      group: "TỔNG QUAN",
-      icon: LayoutDashboard,
-      items: [
-        {
-          name: "Bảng điều khiển",
-          href: API_ROUTES.ROLE_ROUTES.DASHBOARD(user.role),
-          icon: LayoutDashboard,
-        },
-      ],
-    },
-    ...(canSeeSystemManagement && systemSubItems.length > 0
-      ? [
-          {
-            group: "QUẢN LÝ HỆ THỐNG",
-            icon: Settings,
-            items: systemSubItems,
-          },
-        ]
-      : []),
-    ...(canSeeDataInspection && dataInspectionSubItems.length > 0
-      ? [
-          {
-            group: "KIỂM TRA DỮ LIỆU",
-            icon: Database,
-            items: dataInspectionSubItems,
-          },
-        ]
-      : []),
-  ];
+  const isHomePage = pathname === "/";
+
+  // Nav menu items:
+  // - Khi ở Trang chủ: Ẩn toàn bộ menu nghiệp vụ của Dashboard (danh sách trên trống)
+  // - Khi ở Dashboard / Màn hình quản lý: Chỉ hiển thị các nhóm chức năng nghiệp vụ, bỏ nhóm điều hướng/tổng quan
+  const menuItems = isHomePage
+    ? []
+    : [
+        ...(canSeeSystemManagement && systemSubItems.length > 0
+          ? [
+              {
+                group: "QUẢN LÝ HỆ THỐNG",
+                icon: Settings,
+                items: systemSubItems,
+              },
+            ]
+          : []),
+        ...(canSeeDataInspection && dataInspectionSubItems.length > 0
+          ? [
+              {
+                group: "KIỂM TRA DỮ LIỆU",
+                icon: Database,
+                items: dataInspectionSubItems,
+              },
+            ]
+          : []),
+      ];
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 font-sans">
@@ -288,20 +308,7 @@ export default function AppLayout({
             }`}
             title="Student MindX Hub (SMH)"
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-600 via-rose-500 to-red-600 flex items-center justify-center shadow-lg shadow-rose-600/30 ring-1 ring-white/20 group-hover:scale-105 transition-transform shrink-0">
-              <ShieldCheck className="w-6 h-6 text-white" />
-            </div>
-
-            {!sidebarCollapsed && (
-              <div className="flex flex-col min-w-0 transition-opacity duration-300">
-                <span className="text-base font-extrabold tracking-tight bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent whitespace-nowrap">
-                  SMH Platform
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-slate-500 whitespace-nowrap">
-                  Student MindX Hub
-                </span>
-              </div>
-            )}
+            <SMHLogo size="md" collapsed={sidebarCollapsed} />
           </Link>
 
           {/* Desktop Sidebar Collapse Toggle Button */}
@@ -417,40 +424,66 @@ export default function AppLayout({
           })}
         </div>
 
-        {/* Sidebar Compact Bottom Pill */}
+        {/* SIDEBAR BOTTOM ACTION: Nút Chuyển Đổi Trang Chủ / Bảng Điều Khiển Nổi Bật */}
         <div className="p-3 border-t border-slate-100 dark:border-slate-800/80">
-          <div
-            className={`rounded-2xl bg-gradient-to-r from-rose-500/5 to-slate-100 dark:from-rose-950/20 dark:to-slate-900/50 border border-rose-500/10 flex items-center justify-between text-xs ${
-              sidebarCollapsed ? "p-2 justify-center" : "p-3"
-            }`}
-            title="Trạng thái hệ thống: Sẵn sàng 100%"
-          >
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
+          {isHomePage ? (
+            <Link
+              href={API_ROUTES.ROLE_ROUTES.DASHBOARD(user.role)}
+              onClick={() => setMobileMenuOpen(false)}
+              className={`w-full flex items-center rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 hover:scale-[1.02] active:scale-95 transition-all group cursor-pointer ${
+                sidebarCollapsed ? "p-3 justify-center" : "px-3.5 py-3 justify-between"
+              }`}
+              title="Về Bảng điều khiển"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <LayoutDashboard className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" />
+                {!sidebarCollapsed && (
+                  <span className="text-xs tracking-tight whitespace-nowrap">
+                    Về Bảng Điều Khiển
+                  </span>
+                )}
+              </div>
               {!sidebarCollapsed && (
-                <span className="text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
-                  Hệ thống sẵn sàng
-                </span>
+                <ArrowRight className="w-4 h-4 shrink-0 opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
               )}
-            </div>
-            {!sidebarCollapsed && <Sparkles className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
-          </div>
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`w-full flex items-center rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-900/90 hover:border-rose-300 dark:hover:border-rose-900/50 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 text-slate-800 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-400 font-bold shadow-sm hover:shadow transition-all group cursor-pointer ${
+                sidebarCollapsed ? "p-3 justify-center" : "px-3.5 py-3 justify-between"
+              }`}
+              title="Xem Trang chủ"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <HomeIcon className="w-4 h-4 text-rose-500 shrink-0 transition-transform group-hover:scale-110" />
+                {!sidebarCollapsed && (
+                  <span className="text-xs tracking-tight whitespace-nowrap">
+                    Xem Trang Chủ
+                  </span>
+                )}
+              </div>
+              {!sidebarCollapsed && (
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-rose-500 group-hover:translate-x-0.5 transition-all" />
+              )}
+            </Link>
+          )}
         </div>
       </aside>
 
       {/* MAIN CONTENT WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
         {/* TOP HEADER - ĐỒNG BỘ MỌI GIAO DIỆN */}
-        <header className="sticky top-0 z-30 h-20 bg-white/80 dark:bg-[#0B0F17]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-8 flex items-center justify-between transition-colors duration-300">
-          {/* Left: Mobile Menu Toggle & Breadcrumbs */}
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 mr-2">
+        <header className="sticky top-0 z-30 h-20 bg-white/80 dark:bg-[#0B0F17]/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+          <div className="max-w-7xl w-full mx-auto h-full flex items-center justify-between">
+            {/* Left: Mobile Menu Toggle & Breadcrumbs */}
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 mr-2">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors shrink-0"
+              className="lg:hidden p-2.5 min-w-[42px] min-h-[42px] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors shrink-0 cursor-pointer"
               title="Mở thanh điều hướng"
+              aria-label="Mở menu điều hướng"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -544,7 +577,7 @@ export default function AppLayout({
 
               {/* DROPDOWN MENU */}
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-2xl py-2 z-50 animate-fade-in divide-y divide-slate-100 dark:divide-slate-800/80">
+                <div className="absolute right-0 mt-2 w-60 sm:w-64 max-w-[calc(100vw-32px)] rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-2xl py-2 z-50 animate-fade-in divide-y divide-slate-100 dark:divide-slate-800/80">
                   {/* User Meta */}
                   <div className="px-4 py-3">
                     <p className="text-xs font-medium text-slate-400 dark:text-slate-500">
@@ -591,10 +624,11 @@ export default function AppLayout({
               )}
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
         {/* PAGE CONTENT */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0">{children}</main>
 
         {/* SYSTEM FOOTER - ĐỒNG BỘ MỌI GIAO DIỆN */}
         <SystemFooter />

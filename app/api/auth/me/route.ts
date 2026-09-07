@@ -14,24 +14,26 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
 });
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get("id_token")?.value;
+  const smhToken = request.cookies.get("smh_token")?.value;
+  const idToken = request.cookies.get("id_token")?.value;
   const userIdCookie = request.cookies.get("user_id")?.value;
   const userNameCookie = request.cookies.get("user_name")?.value;
   const userRoleCookie = request.cookies.get("user_role")?.value;
 
-  if (!token) {
+  if (!smhToken && !idToken) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
   let name = userNameCookie ? decodeURIComponent(userNameCookie) : "Người dùng";
   let role = userRoleCookie ? decodeURIComponent(userRoleCookie) : "Admin";
+  let email = "";
 
   // Luôn truy vấn trực tiếp Supabase Database để lấy tên và vai trò mới nhất theo thời gian thực (Real-time)
   if (userIdCookie) {
     try {
       const { data: dbUser } = await supabase
         .from("users")
-        .select("id, full_name, lms_code, roles ( name )")
+        .select("id, full_name, lms_code, email, roles ( name )")
         .eq("id", userIdCookie)
         .single();
 
@@ -40,6 +42,10 @@ export async function GET(request: NextRequest) {
           name = dbUser.full_name.trim();
         } else if (dbUser.lms_code) {
           name = dbUser.lms_code.trim();
+        }
+
+        if (dbUser.email) {
+          email = dbUser.email.trim();
         }
 
         const roleRelation = dbUser.roles;
@@ -53,6 +59,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const isTeacherPartTime =
+    role.toLowerCase().includes("part-time") || role.toLowerCase().includes("parttime");
+  const requiresGoogleDrive = isTeacherPartTime && !email;
+
   // Lấy phân quyền màn hình thực tế cho vai trò của người dùng
   const permissions = await getRoleMenuPermissions(role);
 
@@ -62,6 +72,8 @@ export async function GET(request: NextRequest) {
       id: userIdCookie || null,
       name,
       role,
+      email,
+      requires_google_drive: requiresGoogleDrive,
       permissions,
     },
   });
@@ -84,6 +96,13 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
   }
+
+  response.cookies.set("user_email", encodeURIComponent(email), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 7,
+    path: "/",
+  });
 
   response.cookies.set("user_permissions", encodeURIComponent(JSON.stringify(permissions)), {
     httpOnly: false,

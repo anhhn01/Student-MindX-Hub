@@ -66,14 +66,14 @@ export async function POST(request: NextRequest) {
     // Step 1: Query Supabase to find user with JOIN to user_statuses and roles
     let { data: userData, error: supabaseError } = await supabase
       .from("users")
-      .select("id, lms_code, password_hash, full_name, status_id, role_id, is_firebase, user_statuses(id, name), roles(id, name)")
+      .select("id, lms_code, email, password_hash, full_name, status_id, role_id, is_firebase, user_statuses(id, name), roles(id, name)")
       .eq("lms_code", inputLmsCode)
       .maybeSingle();
 
     if (supabaseError && supabaseError.message?.includes("is_firebase")) {
       const fallbackQuery = await supabase
         .from("users")
-        .select("id, lms_code, password_hash, full_name, status_id, role_id, user_statuses(id, name), roles(id, name)")
+        .select("id, lms_code, email, password_hash, full_name, status_id, role_id, user_statuses(id, name), roles(id, name)")
         .eq("lms_code", inputLmsCode)
         .maybeSingle();
       userData = fallbackQuery.data ? ({ ...fallbackQuery.data, is_firebase: undefined } as any) : null;
@@ -208,6 +208,19 @@ async function buildLoginSuccessResponse(
 
   console.log(`User role resolved: ${userRoleText}, Status: ${statusText}, Redirecting to: ${redirectUrl}`);
 
+  // Kiểm tra nếu hệ thống đang bật bảo trì thì chỉ Admin mới được đăng nhập
+  const { getMaintenanceStatus } = await import("@/lib/services/maintenance-service");
+  const maintenanceStatus = getMaintenanceStatus();
+  if (maintenanceStatus.isEnabled && !rawRoleName.includes("admin")) {
+    return NextResponse.json(
+      {
+        error:
+          "Hệ thống đang trong chế độ bảo trì định kỳ. Hiện tại chỉ tài khoản Quản trị viên mới được phép đăng nhập.",
+      },
+      { status: 503 }
+    );
+  }
+
   // Tự động đồng bộ cơ sở trực thuộc từ LMS nếu là tài khoản LMS
   if (userData.is_firebase || !userData.password_hash || String(userData.password_hash).startsWith("LMS_")) {
     (async () => {
@@ -240,10 +253,20 @@ async function buildLoginSuccessResponse(
     })();
   }
 
-  // 1. Đọc cấu hình thời gian duy trì phiên đăng nhập của người dùng (mặc định 7 ngày, tối đa 30 ngày)
-  const userExpiryDays = getUserTokenExpiryDays(userData.id, lmsCode);
+  // 1. Cấu hình thời gian duy trì phiên đăng nhập: cố định 30 ngày
+  const userExpiryDays = 30;
 
-  // 2. Ký token JWT định danh SMH với thời hạn tương ứng
+  const userEmail = (userData.email || "").trim();
+  const isTeacherPartTime =
+    userRoleText.toLowerCase().includes("part-time") ||
+    userRoleText.toLowerCase().includes("parttime");
+  const requiresGoogleDrive = isTeacherPartTime && !userEmail;
+
+  if (requiresGoogleDrive) {
+    redirectUrl = "/connect-google-drive";
+  }
+
+  // 2. Ký token JWT định danh SMH với thời hạn 30 ngày
   const { token: smhToken, expiryDays, maxAgeSeconds } = await signSmhToken(
     {
       userId: userData.id,
@@ -251,6 +274,7 @@ async function buildLoginSuccessResponse(
       name: greetingName,
       role: userRoleText,
       status: statusText,
+      email: userEmail,
     },
     userExpiryDays
   );
@@ -264,7 +288,9 @@ async function buildLoginSuccessResponse(
         lms_code: lmsCode,
         role: userRoleText, // Text string representation, NOT raw ID
         status: statusText, // Text string representation, NOT raw ID
+        email: userEmail,
         token_expiry_days: expiryDays,
+        requires_google_drive: requiresGoogleDrive,
       },
       token: smhToken,
       id_token: firebaseData.idToken,
@@ -277,6 +303,15 @@ async function buildLoginSuccessResponse(
   // Lưu SMH JWT Token chính thức vào HttpOnly cookie để Middleware xác thực
   res.cookies.set("smh_token", smhToken, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
+    path: "/",
+  });
+
+  // Lưu user_email vào cookie cho Client & Middleware tra cứu nhanh
+  res.cookies.set("user_email", encodeURIComponent(userEmail), {
+    httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     maxAge: maxAgeSeconds,
     sameSite: "lax",
