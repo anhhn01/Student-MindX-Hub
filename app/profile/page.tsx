@@ -17,6 +17,7 @@ import {
   Mail,
   Calendar,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 
@@ -27,8 +28,12 @@ interface UserProfileData {
   lms_code: string;
   is_firebase: boolean;
   account_source: string;
+  can_edit_name?: boolean;
+  can_edit_password?: boolean;
+  name_message?: string;
   role: string;
   status: string;
+  token_expiry_days?: number;
   created_at: string;
 }
 
@@ -68,15 +73,46 @@ export default function ProfilePage() {
     e.preventDefault();
     setFeedback(null);
 
+    const payload: Record<string, any> = {};
+
+    // 1. Ràng buộc họ tên nếu được phép sửa
+    if (profile?.can_edit_name) {
+      const cleanName = fullName.trim();
+      if (!cleanName || cleanName.length < 2) {
+        setFeedback({ type: "error", message: "Họ và tên bắt buộc và phải có ít nhất 2 ký tự." });
+        return;
+      }
+      if (cleanName.length > 70) {
+        setFeedback({ type: "error", message: "Họ và tên không được vượt quá 70 ký tự." });
+        return;
+      }
+      payload.full_name = cleanName;
+    }
+
+    // 2. Ràng buộc mật khẩu: Kiểm tra độ dài và xác nhận
     if (password && password.length > 0) {
+      if (profile?.is_firebase) {
+        setFeedback({ type: "error", message: "Tài khoản LMS không được phép thay đổi mật khẩu tại đây." });
+        return;
+      }
       if (password.length < 6) {
         setFeedback({ type: "error", message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
+        return;
+      }
+      if (password.length > 50) {
+        setFeedback({ type: "error", message: "Mật khẩu mới không được vượt quá 50 ký tự." });
         return;
       }
       if (password !== confirmPassword) {
         setFeedback({ type: "error", message: "Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại." });
         return;
       }
+      payload.password = password;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setFeedback({ type: "error", message: "Không có thông tin nào được thay đổi hoặc thông tin đang được khóa cố định." });
+      return;
     }
 
     setSaveLoading(true);
@@ -84,15 +120,15 @@ export default function ProfilePage() {
       const res = await fetch(API_ROUTES.USER.API_PROFILE, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: fullName,
-          password: password.trim().length > 0 ? password : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
       if (res.ok) {
-        setFeedback({ type: "success", message: "Đã cập nhật thông tin cá nhân thành công!" });
+        setFeedback({
+          type: "success",
+          message: "Đã cập nhật thông tin cá nhân thành công!",
+        });
         setPassword("");
         setConfirmPassword("");
         fetchProfile();
@@ -253,17 +289,50 @@ export default function ProfilePage() {
 
                   {/* Họ và tên */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Họ và tên *
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span>Họ và tên *</span>
+                        {!profile.can_edit_name ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold border border-rose-500/20 whitespace-nowrap">
+                            (Cố định từ LMS)
+                          </span>
+                        ) : profile.is_firebase ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold border border-amber-500/20 whitespace-nowrap">
+                            (Chưa có họ tên trên LMS - Được phép sửa)
+                          </span>
+                        ) : null}
+                      </span>
+                      {profile.can_edit_name && (
+                        <span
+                          className={`text-[10px] ${
+                            fullName.length > 70 ? "text-rose-500 font-bold" : "text-slate-400"
+                          }`}
+                        >
+                          {fullName.length}/70 ký tự
+                        </span>
+                      )}
                     </label>
                     <input
                       type="text"
-                      required
+                      required={profile.can_edit_name}
+                      minLength={2}
+                      maxLength={70}
+                      disabled={!profile.can_edit_name}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Nhập họ và tên..."
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                      className={`w-full px-4 py-2.5 rounded-2xl border text-sm outline-none transition-all ${
+                        !profile.can_edit_name
+                          ? "border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/30 text-slate-500 cursor-not-allowed select-none"
+                          : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white focus:ring-2 focus:ring-rose-500"
+                      }`}
                     />
+                    {profile.name_message && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                        <span>{profile.name_message}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Readonly info grid: Email & LMS Code */}
@@ -300,71 +369,138 @@ export default function ProfilePage() {
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
                       <KeyRound className="w-4 h-4 text-rose-500" />
                       <span>Đổi Mật Khẩu</span>
+                      {profile.is_firebase && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold border border-rose-500/20 whitespace-nowrap">
+                          (Khóa - Chỉ dành cho tài khoản website cấp)
+                        </span>
+                      )}
                     </h4>
                     <p className="text-xs text-slate-400 mb-4">
                       {profile.is_firebase
-                        ? "Tài khoản LMS xác thực trực tiếp qua hệ thống LMS MindX nên không thay đổi mật khẩu tại đây."
-                        : "Để trống nếu bạn không có nhu cầu thay đổi mật khẩu hiện tại."}
+                        ? "Mật khẩu chỉ được thay đổi khi tài khoản do website cấp. Tài khoản LMS được xác thực trực tiếp qua hệ thống LMS MindX."
+                        : "Để trống nếu bạn không có nhu cầu thay đổi mật khẩu hiện tại (Ràng buộc: 6 - 50 ký tự)."}
                     </p>
 
                     {!profile.is_firebase ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                            Mật khẩu mới
-                          </label>
-                          <div className="relative">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Mật khẩu mới
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                autoComplete="new-password"
+                                placeholder="Tối thiểu 6 ký tự..."
+                                maxLength={50}
+                                className="w-full pl-4 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                              Xác nhận mật khẩu mới
+                            </label>
                             <input
                               type={showPassword ? "text" : "password"}
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
                               autoComplete="new-password"
-                              placeholder="Tối thiểu 6 ký tự..."
-                              className="w-full pl-4 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                              placeholder="Nhập lại mật khẩu mới..."
+                              maxLength={50}
+                              className={`w-full px-4 py-2.5 rounded-2xl border bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 transition-all ${
+                                confirmPassword && password !== confirmPassword
+                                  ? "border-rose-500 focus:ring-rose-500"
+                                  : confirmPassword && password === confirmPassword
+                                  ? "border-emerald-500 focus:ring-emerald-500"
+                                  : "border-slate-200 dark:border-slate-800 focus:ring-rose-500"
+                              }`}
                             />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              tabIndex={-1}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                            Xác nhận mật khẩu mới
-                          </label>
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            autoComplete="new-password"
-                            placeholder="Nhập lại mật khẩu mới..."
-                            className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-rose-500 transition-all"
-                          />
-                        </div>
+                        {/* Password strength and match hints */}
+                        {password.length > 0 && (
+                          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-500">Độ mạnh mật khẩu:</span>
+                              <span
+                                className={`font-bold ${
+                                  password.length < 6
+                                    ? "text-rose-500"
+                                    : password.length < 10
+                                    ? "text-amber-500"
+                                    : "text-emerald-500"
+                                }`}
+                              >
+                                {password.length < 6
+                                  ? "Yếu (ít hơn 6 ký tự)"
+                                  : password.length < 10
+                                  ? "Trung bình"
+                                  : "Mạnh"}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${
+                                  password.length < 6
+                                    ? "w-1/4 bg-rose-500"
+                                    : password.length < 10
+                                    ? "w-2/3 bg-amber-500"
+                                    : "w-full bg-emerald-500"
+                                }`}
+                              />
+                            </div>
+                            {confirmPassword && password !== confirmPassword && (
+                              <p className="text-rose-500 text-[11px] font-medium pt-1">
+                                ⚠ Mật khẩu xác nhận chưa trùng khớp.
+                              </p>
+                            )}
+                            {confirmPassword && password === confirmPassword && (
+                              <p className="text-emerald-500 text-[11px] font-medium pt-1">
+                                ✓ Mật khẩu xác nhận trùng khớp hoàn toàn.
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs flex items-center gap-2">
-                        <Lock className="w-4 h-4 shrink-0" />
-                        <span>Chức năng đổi mật khẩu bị khóa cho tài khoản LMS có sẵn.</span>
+                      <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs flex items-center gap-2">
+                        <Lock className="w-4 h-4 shrink-0 text-slate-400" />
+                        <span>Mật khẩu chỉ được thay đổi khi là tài khoản do website cấp.</span>
                       </div>
                     )}
                   </div>
 
                   {/* Nút Submit */}
                   <div className="pt-4 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={saveLoading}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-sm shadow-lg shadow-rose-600/30 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>{saveLoading ? "Đang lưu thay đổi..." : "Lưu Thông Tin"}</span>
-                    </button>
+                    {!profile.can_edit_name && !profile.can_edit_password ? (
+                      <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs font-semibold">
+                        <Lock className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Thông tin cá nhân được bảo lưu cố định từ LMS</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={saveLoading}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-sm shadow-lg shadow-rose-600/30 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 cursor-pointer"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>{saveLoading ? "Đang lưu thay đổi..." : "Lưu Thông Tin"}</span>
+                      </button>
+                    )}
                   </div>
                 </form>
               </div>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="mindxRed1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F43F5E" />
+      <stop offset="100%" stop-color="#E11D48" />
+    </linearGradient>
+    <linearGradient id="mindxRed2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#BE123C" />
+      <stop offset="100%" stop-color="#9F1239" />
+    </linearGradient>
+    <linearGradient id="mindxAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185" />
+      <stop offset="100%" stop-color="#E11D48" />
+    </linearGradient>
+    <linearGradient id="mindxDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#881337" />
+      <stop offset="100%" stop-color="#4C0519" />
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="96" height="96" rx="24" fill="#0D1117" stroke="#E11D48" stroke-width="4" />
+
+  <polygon points="24,20 46,20 34,46 16,36" fill="url(#mindxRed1)" />
+  <polygon points="76,20 54,20 66,46 84,36" fill="url(#mindxAmber)" />
+  <polygon points="50,38 64,50 50,62 36,50" fill="#FFFFFF" opacity="0.95" />
+  <polygon points="50,42 58,50 50,58 42,50" fill="url(#mindxRed1)" />
+  <polygon points="16,64 34,54 46,80 24,80" fill="url(#mindxDark)" />
+  <polygon points="84,64 66,54 54,80 76,80" fill="url(#mindxRed2)" />
+
+  <circle cx="50" cy="50" r="3.5" fill="#FFFFFF" />
+</svg>

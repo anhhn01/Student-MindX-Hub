@@ -199,7 +199,7 @@ export async function checkLmsAccount(cleanCode: string): Promise<{
   return { exists: false };
 }
 
-// Lấy danh mục cơ sở chính thống từ LMS
+// Lấy danh mục cơ sở chính thống từ LMS (Hỗ trợ phân trang để lấy đầy đủ 101+ cơ sở)
 export async function fetchOfficialCentresList(token?: string): Promise<Array<{ id: string; name: string; shortName?: string; code?: string }>> {
   const { OFFICIAL_LMS_CENTRES } = await import("@/lib/constants/centres");
   const authToken = token || (await getAdminFirebaseToken());
@@ -209,11 +209,14 @@ export async function fetchOfficialCentresList(token?: string): Promise<Array<{ 
   }
 
   try {
-    const query = `
-      query GetCentresFromTeachers {
-        teachers(payload: { itemsPerPage: 300 }) {
-          data {
-            centres {
+    let pageIndex = 0;
+    const map = new Map<string, { id: string; name: string; shortName?: string; code?: string }>();
+
+    while (true) {
+      const query = `
+        query GetCentresList($pageIndex: Int) {
+          centres(payload: { itemsPerPage: 100, pageIndex: $pageIndex }) {
+            data {
               id
               name
               shortName
@@ -221,47 +224,49 @@ export async function fetchOfficialCentresList(token?: string): Promise<Array<{ 
             }
           }
         }
+      `;
+
+      const res = await fetch(LMS_GRAPHQL_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ query, variables: { pageIndex } }),
+      });
+
+      const data = await res.json();
+      const pageData = data.data?.centres?.data;
+
+      if (!Array.isArray(pageData) || pageData.length === 0) {
+        break;
       }
-    `;
 
-    const res = await fetch(LMS_GRAPHQL_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({ query }),
-    });
-
-    const data = await res.json();
-    const teachersList = data.data?.teachers?.data;
-
-    if (Array.isArray(teachersList) && teachersList.length > 0) {
-      const map = new Map<string, { id: string; name: string; shortName?: string; code?: string }>();
-      for (const t of teachersList) {
-        if (Array.isArray(t.centres)) {
-          for (const c of t.centres) {
-            if (c && c.id && !map.has(c.id)) {
-              map.set(c.id, {
-                id: c.id,
-                name: c.name,
-                shortName: c.shortName || undefined,
-                code: c.code || undefined,
-              });
-            }
-          }
+      for (const c of pageData) {
+        if (c && c.id && !map.has(c.id)) {
+          map.set(c.id, {
+            id: c.id,
+            name: c.name,
+            shortName: c.shortName || undefined,
+            code: c.code || undefined,
+          });
         }
       }
 
-      if (map.size > 0) {
-        // Gộp thêm với danh mục chuẩn nếu thiếu
-        for (const defaultC of OFFICIAL_LMS_CENTRES) {
-          if (!map.has(defaultC.id)) {
-            map.set(defaultC.id, defaultC);
-          }
-        }
-        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+      if (pageData.length < 100) {
+        break;
       }
+      pageIndex++;
+    }
+
+    if (map.size > 0) {
+      // Gộp thêm với danh mục chuẩn nếu có cơ sở mới
+      for (const defaultC of OFFICIAL_LMS_CENTRES) {
+        if (!map.has(defaultC.id)) {
+          map.set(defaultC.id, defaultC);
+        }
+      }
+      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "vi"));
     }
   } catch (err) {
     console.error("Lỗi khi lấy danh sách cơ sở từ LMS:", err);

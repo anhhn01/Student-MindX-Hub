@@ -12,6 +12,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+import fs from "fs";
+import path from "path";
+
+const STATS_FILE = path.join(process.cwd(), "data", "site_stats.json");
+
 // Cache in-memory lượt truy cập và tăng mỗi khi được gọi
 let globalVisits = 1420;
 const roleVisits: Record<string, number> = {
@@ -20,18 +25,53 @@ const roleVisits: Record<string, number> = {
   "Teacher Part-time": 222,
 };
 
+function loadStoredStats() {
+  try {
+    if (fs.existsSync(STATS_FILE)) {
+      const raw = fs.readFileSync(STATS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.globalVisits === "number") {
+        globalVisits = parsed.globalVisits;
+      }
+      if (parsed.roleVisits && typeof parsed.roleVisits === "object") {
+        Object.assign(roleVisits, parsed.roleVisits);
+      }
+    }
+  } catch (e) {
+    console.warn("Lỗi đọc site_stats.json:", e);
+  }
+}
+
+function saveStoredStats() {
+  try {
+    const dir = path.dirname(STATS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      STATS_FILE,
+      JSON.stringify({ globalVisits, roleVisits, updatedAt: new Date().toISOString() }),
+      "utf-8"
+    );
+  } catch (e) {
+    console.warn("Lỗi ghi site_stats.json:", e);
+  }
+}
+
+// Khởi động đọc từ disk
+loadStoredStats();
+
 export async function GET(request: NextRequest) {
   try {
     const rawRole = request.cookies.get("user_role")?.value;
     const userRole = rawRole ? decodeURIComponent(rawRole) : "Admin";
 
-    // Tăng lượt truy cập cho hệ thống
+    // Tăng lượt truy cập cho hệ thống và lưu trữ bền vững
     globalVisits += 1;
     if (roleVisits[userRole] !== undefined) {
       roleVisits[userRole] += 1;
     } else {
       roleVisits[userRole] = 1;
     }
+    saveStoredStats();
 
     // Lấy tổng số tài khoản thực tế từ Supabase
     const { count: totalUsers, error: countError } = await supabase

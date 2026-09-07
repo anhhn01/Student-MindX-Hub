@@ -51,6 +51,75 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
     - **Lọc thô triệt để ca Makeup**: Tự động loại bỏ 100% các ca có `type` liên quan đến dạy bù (`MAKEUP`, `MAKE_UP`, `BÙ`, `BU`).
     - **Tính năng sao chép ảnh theo từng cơ sở & toàn bộ cơ sở**: Dưới mỗi tên cơ sở có nút "Sao chép ảnh" lưu thẳng Clipboard để dán nhanh (Ctrl+V) vào nhóm Zalo. **Chỉ hiển thị nút sao chép đối với các cơ sở có ca trải nghiệm**. Nút sao chép toàn bộ cơ sở nằm trên thanh công cụ trên cùng.
     - **Bắt buộc bọc bằng AppLayout**: Màn hình lịch trải nghiệm phải kế thừa `AppLayout` đầy đủ Sidebar bên trái, Header người dùng bên trên và Footer thông tin hệ thống bên dưới.
+18. **Quy Chuẩn Tài Khoản Kiểm Thử Chính Thức (Official Test Accounts Standard)**:
+    - Khi thực hiện kiểm thử tự động, kiểm tra giao diện hay kiểm thử API, Agent **bắt buộc sử dụng bộ tài khoản chính thức sau, tuyệt đối không nhập lan man**:
+      - **Admin**: `admin` / `Nh@t@nh12@8` (Sở hữu đầy đủ 101 cơ sở trực thuộc và toàn quyền quản trị).
+      - **Teacher Full-time**: `anhhn01` / `Nh@t@nh12@8` (Thuộc 4 cơ sở trực thuộc và phân quyền full-time).
+      - **Teacher Part-time**: `huynhnhatanh` / `Nh@t@nh12@8` (Thuộc 4 cơ sở trực thuộc và phân quyền part-time).
+19. **Cơ Chế Bảo Mật JWT & Thời Gian Duy Trì Tài Khoản Cố Định 30 Ngày (JWT Security & 30-Day Session Standard)**:
+    - Secret key tạo JWT đặt tại `.env` với biến `JWT_SECRET=student-mindx-hub`.
+    - Token định danh `smh_token` được ký thuật toán `HS256` qua thư viện `jose`, lưu trong HttpOnly cookie an toàn.
+    - **Thời gian duy trì tài khoản (Session Maintenance)**: Cố định hết hạn sau **30 ngày** cho toàn bộ tài khoản. Khi token hết hạn, Middleware tự động xóa phiên và đẩy về trang đăng nhập (`/login?redirect=...&reason=expired`).
+20. **Danh Mục 101 Cơ Sở LMS & Tiêu Chuẩn Xuất Ảnh Lịch Trải Nghiệm Không Bị Đen (LMS Centres & Zero-Black Export Standard)**:
+    - Hệ thống áp dụng danh mục đầy đủ **101 cơ sở chính thống** từ MindX LMS GraphQL (`OFFICIAL_LMS_CENTRES`), tài khoản `admin` được gán toàn bộ 101 cơ sở này để kiểm tra toàn hệ thống.
+    - Vùng xuất ảnh sao chép lịch trải nghiệm (cả từng cơ sở và toàn bộ cơ sở) phải được cô lập trong wrapper tọa độ riêng biệt, đảm bảo thẻ được chụp luôn giữ tọa độ `left: 0; position: relative` và tính toán `scrollHeight` đầy đủ để triệt tiêu 100% hiện tượng ảnh xuất ra bị đen hoặc mất nội dung. Ảnh sao chép toàn bộ cơ sở bắt buộc có banner tiêu đề tổng thể nổi bật.
+21. **Quy Chuẩn Ràng Buộc Dữ Liệu & Xác Thực Toàn Hệ Thống (Comprehensive Data Validation & Constraints Standard)**:
+    - **Hồ sơ cá nhân (`/profile`)**:
+      - `full_name`: 
+        - **Tài khoản LMS có họ tên trên hệ thống LMS**: Khóa cố định 100% (`disabled` / read-only), hiển thị badge `(Cố định từ LMS)`.
+        - **Tài khoản LMS chưa có họ tên trên hệ thống LMS**: Có quyền chỉnh sửa và lưu họ tên vào hệ thống (ràng buộc 2 - 70 ký tự).
+        - **Tài khoản do website tạo nội bộ**: Luôn có quyền chỉnh sửa họ tên tự do (ràng buộc 2 - 70 ký tự).
+      - `password`: **Mật khẩu chỉ được thay đổi khi là tài khoản do website cấp** (tài khoản nội bộ, ràng buộc 6 - 50 ký tự, kiểm tra trùng khớp xác nhận mật khẩu và có thanh đo độ mạnh mật khẩu trực quan). Tuyệt đối khóa 100% đối với tài khoản LMS (`is_firebase = true`, do xác thực trực tiếp qua hạ tầng LMS MindX).
+      - `lms_code` & `email`: Khóa cố định 100% (`disabled` / read-only), tuyệt đối không cho phép tự ý chỉnh sửa.
+    - **Phân cấp vai trò & quyền hạn (Role Hierarchy Scope)**: Tuyệt đối khóa quyền tự thay đổi vai trò, tự đổi trạng thái, tự xóa tài khoản của chính mình và của các tài khoản có cấp bậc bằng hoặc cao hơn mình (`targetRolePoints <= currentUserRolePoints`).
+22. **Quy Chuẩn Gợi Ý Đăng Nhập & Chống Tự Điền Ban Đầu (Login Autocomplete & Anti-Initial-Autofill Standard)**:
+    - Form đăng nhập hỗ trợ tính năng gợi ý tài khoản đã lưu trên trình duyệt (`autoComplete="username"`, `name="username"`).
+    - Ngăn chặn trình duyệt tự động điền sẵn thông tin khi vừa tải trang thông qua cơ chế kích hoạt tương tác (`readOnly` ban đầu, tự gỡ bỏ khi người dùng nhấp/chạm vào ô nhập) để đảm bảo tính riêng tư mà vẫn mở gợi ý đầy đủ khi người dùng tương tác.
+23. **Quy Chuẩn Quy Trình Đẩy Code Git & Cập Nhật Phiên Bản (Git Push & Version Update Standard)**:
+    - Khi người dùng yêu cầu push code lên Git, Agent **bắt buộc tuân thủ đúng trình tự các bước sau**:
+      1. Rà soát `.gitignore` và loại bỏ triệt để các file nhạy cảm, file tạm thời, file rác/scratch.
+      2. **Cập nhật phiên bản hệ thống tập trung tại `lib/constants/version.ts`**: Khi có tính năng mới, bắt buộc tăng số hiệu phiên bản (`vx.x`, ví dụ `v1.5`), cập nhật ngày phát hành và tóm tắt các chức năng chính (ngắn gọn, không quá chuyên môn).
+      3. Chạy kiểm tra bản build: `npm run build` (đảm bảo biên dịch thành công, không có lỗi runtime/build).
+      4. Thêm các thay đổi vào stage: `git add .`
+      5. Kéo cập nhật mới nhất từ nhánh đích: `git pull origin preview`
+      6. Xử lý conflict (nếu có) cẩn thận, đảm bảo tính toàn vẹn của code.
+      7. Tạo commit với thông điệp bằng tiếng Anh mô tả rõ chức năng chính và các thay đổi kèm theo (`git commit -m "<Main Feature>: <Detailed changes in English>"`).
+      8. Đẩy code lên remote: `git push origin preview`.
+24. **Quy Chuẩn Badge Nổi Hiển Thị Lượt Truy Cập Trang Web (Floating Visit Count Badge Standard)**:
+    - Hiển thị badge nổi cố định ở **góc dưới bên phải màn hình, lơ lửng phía trên Chân trang (Footer)** (`fixed bottom-16 right-3 sm:bottom-20 sm:right-6 z-40`), hoàn toàn tách biệt khỏi Header, Footer và khu vực tương tác chính để tuyệt đối không che khuất bất kỳ nút bấm hay thông tin phiên bản / bản quyền nào.
+    - Đảm bảo tính responsive 100% trên cả thiết bị di động lẫn máy tính để bàn.
+    - Tích hợp **chấm tròn màu xanh nhấp nháy (pulsing green dot)** hiệu ứng `animate-ping` biểu thị trạng thái hoạt động trực tiếp theo thời gian thực (live activity).
+    - Hiển thị số lượt truy cập trang web thực tế được định dạng chuẩn Việt Nam (ví dụ: `1.431 lượt truy cập`), kết hợp cơ chế lưu trữ bền vững tại `data/site_stats.json`.
+25. **Quy Chuẩn Chế Độ Bảo Trì Hệ Thống & Màn Hình Bảo Trì Cố Định (Maintenance Mode & Persistent Screen Standard)**:
+    - Quản trị viên (Admin) quản lý bảo trì tại `/[role]/system-management/maintenance`.
+    - **Màn hình bảo trì xuất hiện đầu tiên & cố định liên tục**: Khi kích hoạt bảo trì, toàn bộ người dùng (kể cả truy cập Trang chủ `/` hay `/login` thông thường) đều bị Middleware chuyển hướng ngay lập tức về trang `/maintenance` và lưu lại ở đó liên tục cho đến khi bảo trì kết thúc. Tuyệt đối không chỉ hiển thị một thông báo thông thường rồi cho ở lại trang khác.
+    - **Kênh đăng nhập đặc thù cho Quản trị viên**: Trên trang `/maintenance`, chỉ Quản trị viên mới có thể nhấp nút "Quản trị viên đăng nhập" (`/login?admin=1`) để truy cập form đăng nhập quản trị. Nếu tài khoản không phải Admin cố tình đăng nhập trong thời gian bảo trì, hệ thống từ chối và điều hướng ngay về `/maintenance`.
+    - Hỗ trợ ô nhập ngày giờ dự kiến kết thúc (`datetime-local`). Nếu để trống, hệ thống tự động thiết lập mặc định là **3 tiếng** kể từ thời điểm bật.
+    - **Cách ly môi trường 100%**: Việc bật/tắt bảo trì trên máy cục bộ (Local) lưu trong `data/maintenance_status.json` (được bảo vệ bởi `.gitignore`), tuyệt đối không làm ảnh hưởng hay gián đoạn hệ thống trên môi trường Production.
+26. **Quy Chuẩn Quản Lý Nhật Ký Phiên Bản Mới Nhất (Single Latest Version Changelog Standard)**:
+    - Quản lý phiên bản tập trung duy nhất tại `lib/constants/version.ts` (`CURRENT_VERSION`).
+    - Trang Changelog (`/changelog`) **chỉ hiển thị duy nhất 1 phiên bản mới nhất**, tóm tắt các tính năng chính một cách tinh gọn, dễ hiểu, không dùng thuật ngữ kỹ thuật quá chuyên môn.
+    - Chân trang (Footer) hiển thị đúng số hiệu phiên bản mới nhất kèm liên kết dẫn trực tiếp đến `/changelog`, tuyệt đối không ghi chữ "production".
+    - **Bắt buộc**: Mỗi lần có chức năng mới được đẩy lên Git, Agent bắt buộc phải cập nhật tăng phiên bản (`vx.x`) và tóm tắt chức năng mới vào `lib/constants/version.ts` trước khi commit.
+27. **Quy Chuẩn Nhận Diện Thương Hiệu & Logo SMH Hỗ Trợ Đa Giao Diện Sáng/Tối (SMH Dual-Theme Brand Identity Standard)**:
+    - Sử dụng bộ nhận diện logo chính thức `<SMHLogo />` kế thừa phong cách hình học đa giác chữ X đặc trưng của MindX kết hợp chữ SMH và dải màu đỏ Ruby/Crimson chủ đạo (`#E11D48`, `#BE123C`). Tuyệt đối không gắn thêm badge "HUB" cạnh chữ SMH (vì chữ H vốn dĩ là Hub).
+    - **Tương thích hoàn hảo Sáng & Tối (Light & Dark Theme Parity)**: Chữ logo dùng màu động `text-slate-900 dark:text-white`, phụ đề `text-slate-500 dark:text-slate-400`, nền squircle dùng `fill-slate-100 dark:fill-[#0D1117]` và viền `stroke-rose-500/20 dark:stroke-rose-500/35`. Tuyệt đối không hardcode nền đen hay chữ trắng thô cứng trong chế độ Sáng.
+    - Đồng bộ hiển thị logo trên toàn bộ Header, Sidebar, Card Đăng nhập, Hero Trang chủ và Chân trang hệ thống.
+28. **Quy Chuẩn Không Tự Tiện Thêm Nội Dung / Nút / Card Vào Giao Diện (Strict Content & UI Boundary Standard)**:
+    - Agent tuyệt đối **KHÔNG ĐƯỢC PHÉP tự tiện thêm chữ, nút bấm, card tính năng, banner hoặc bất kỳ phần tử nội dung nào khác** vào giao diện (đặc biệt là trang chủ hoặc các màn hình chính) nếu chưa hỏi ý kiến hoặc chưa có yêu cầu cụ thể từ người dùng.
+    - Mọi sự sáng tạo về nội dung, tính năng hoặc bố cục đều phải tuân theo chỉ thị cụ thể của người dùng. Không suy diễn tự ý bổ sung các khối card/chức năng ngoài luồng.
+29. **Quy Chuẩn Nút Chuyển Đổi Trang Chủ / Dashboard Tại Đáy Sidebar (Sidebar Bottom Action Standard)**:
+    - Loại bỏ nhóm menu "Tổng quan / Điều hướng" ở đầu danh sách menu trên Sidebar để tránh trùng lặp và gây rối mắt.
+    - Khi ở Trang chủ (`/`), toàn bộ menu nghiệp vụ của Dashboard bị ẩn hoàn toàn, khu vực cuộn menu phía trên để trống tinh gọn.
+    - Khối "Hệ thống sẵn sàng" tại chân Sidebar được thay thế bằng Action Button điều hướng độc lập, có thiết kế nổi bật và khác biệt hoàn toàn với các item menu thông thường:
+      - Khi ở Trang chủ: Nút nổi bật gradient Đỏ Ruby (`from-rose-600 to-red-600`) đổ bóng với icon `LayoutDashboard` và chữ **"Về Bảng Điều Khiển"**.
+      - Khi ở Dashboard / màn hình quản lý: Thẻ bo tròn viền tinh tế với icon `Home` màu Rose và chữ **"Xem Trang Chủ"**.
+      - Hỗ trợ đầy đủ trạng thái mở rộng (288px) lẫn thu gọn (80px) kèm tooltip.
+30. **Quy Chuẩn Bắt Buộc Liên Kết Google Drive Đối Với Teacher Part-time (Mandatory Google Drive OAuth for Part-time Teachers Standard)**:
+    - Áp dụng đối với mọi tài khoản có vai trò `Teacher Part-time` mà trường `email` trong bảng `users` Supabase đang rỗng (`NULL` hoặc `""`).
+    - Khi đăng nhập hoặc truy cập bất kỳ route nào trong hệ thống, Middleware tự động chặn và chuyển hướng bắt buộc về `/connect-google-drive`.
+    - Người dùng không được phép truy cập bất kỳ tính năng nào khác cho đến khi hoàn tất liên kết Google Drive qua OAuth (scopes: `drive.file`, `userinfo.email`, `userinfo.profile`).
+    - Sau khi xác thực Google thành công, email nhận được từ Google được lưu trực tiếp vào bảng `users.email` trong Supabase và lưu token Google Drive an toàn tại `data/google_drive_tokens.json`. Hệ thống cấp lại JWT `smh_token` có chứa email để mở khóa toàn bộ quyền truy cập.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

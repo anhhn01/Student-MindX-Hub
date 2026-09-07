@@ -250,11 +250,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (forceLogout) {
-      res.cookies.delete("id_token");
-      res.cookies.delete("refresh_token");
-      res.cookies.delete("user_role");
-      res.cookies.delete("user_name");
-      res.cookies.delete("user_id");
+      const authCookies = [
+        "smh_token",
+        "id_token",
+        "refresh_token",
+        "user_id",
+        "user_name",
+        "user_role",
+        "user_permissions",
+      ];
+      authCookies.forEach((c) => {
+        res.cookies.delete(c);
+        res.cookies.set(c, "", { maxAge: 0, path: "/", expires: new Date(0) });
+      });
     }
 
     return res;

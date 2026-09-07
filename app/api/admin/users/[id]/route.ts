@@ -29,22 +29,12 @@ export async function PATCH(
       : "Admin";
     const currentRolePoints = getRolePoints(currentUserRole);
 
-    // 1. Fetch existing user to verify is_firebase status and role
-    let { data: targetUser, error: fetchError } = await supabase
+    // 1. Fetch existing user to verify LMS status and role
+    const { data: targetUser, error: fetchError } = await supabase
       .from("users")
-      .select("id, is_firebase, email, lms_code, full_name, roles ( name )")
+      .select("id, password_hash, email, lms_code, full_name, roles ( name )")
       .eq("id", userId)
       .single();
-
-    if (fetchError && fetchError.message?.includes("is_firebase")) {
-      const fallback = await supabase
-        .from("users")
-        .select("id, email, lms_code, full_name, roles ( name )")
-        .eq("id", userId)
-        .single();
-      targetUser = fallback.data ? { ...fallback.data, is_firebase: false } : null;
-      fetchError = fallback.error;
-    }
 
     if (fetchError || !targetUser) {
       return NextResponse.json(
@@ -53,10 +43,14 @@ export async function PATCH(
       );
     }
 
-    // 2. Block editing if is_firebase === true
-    if (targetUser.is_firebase) {
+    const isLmsAccount =
+      targetUser.password_hash === "LMS_EXTERNAL_ACCOUNT" ||
+      (targetUser as any).is_firebase === true;
+
+    // 2. Block password change if isLmsAccount
+    if (isLmsAccount && password && password.trim().length > 0) {
       return NextResponse.json(
-        { error: "Tài khoản từ hệ thống LMS có sẵn chỉ được xem, không được phép sửa." },
+        { error: "Mật khẩu chỉ được thay đổi khi là tài khoản do website cấp." },
         { status: 400 }
       );
     }

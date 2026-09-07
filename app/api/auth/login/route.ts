@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 import { getRoleMenuPermissions } from "@/lib/services/permissions-service";
+import { signSmhToken } from "@/lib/auth/jwt";
+import { getUserTokenExpiryDays } from "@/lib/auth/token-settings";
 
 interface LoginRequest {
   lms_code?: string;
@@ -64,14 +66,14 @@ export async function POST(request: NextRequest) {
     // Step 1: Query Supabase to find user with JOIN to user_statuses and roles
     let { data: userData, error: supabaseError } = await supabase
       .from("users")
-      .select("id, lms_code, password_hash, full_name, status_id, role_id, is_firebase, user_statuses(id, name), roles(id, name)")
+      .select("id, lms_code, email, password_hash, full_name, status_id, role_id, is_firebase, user_statuses(id, name), roles(id, name)")
       .eq("lms_code", inputLmsCode)
       .maybeSingle();
 
     if (supabaseError && supabaseError.message?.includes("is_firebase")) {
       const fallbackQuery = await supabase
         .from("users")
-        .select("id, lms_code, password_hash, full_name, status_id, role_id, user_statuses(id, name), roles(id, name)")
+        .select("id, lms_code, email, password_hash, full_name, status_id, role_id, user_statuses(id, name), roles(id, name)")
         .eq("lms_code", inputLmsCode)
         .maybeSingle();
       userData = fallbackQuery.data ? ({ ...fallbackQuery.data, is_firebase: undefined } as any) : null;
@@ -206,6 +208,19 @@ async function buildLoginSuccessResponse(
 
   console.log(`User role resolved: ${userRoleText}, Status: ${statusText}, Redirecting to: ${redirectUrl}`);
 
+  // Kiểm tra nếu hệ thống đang bật bảo trì thì chỉ Admin mới được đăng nhập
+  const { getMaintenanceStatus } = await import("@/lib/services/maintenance-service");
+  const maintenanceStatus = getMaintenanceStatus();
+  if (maintenanceStatus.isEnabled && !rawRoleName.includes("admin")) {
+    return NextResponse.json(
+      {
+        error:
+          "Hệ thống đang trong chế độ bảo trì định kỳ. Hiện tại chỉ tài khoản Quản trị viên mới được phép đăng nhập.",
+      },
+      { status: 503 }
+    );
+  }
+
   // Tự động đồng bộ cơ sở trực thuộc từ LMS nếu là tài khoản LMS
   if (userData.is_firebase || !userData.password_hash || String(userData.password_hash).startsWith("LMS_")) {
     (async () => {
@@ -238,6 +253,32 @@ async function buildLoginSuccessResponse(
     })();
   }
 
+  // 1. Cấu hình thời gian duy trì phiên đăng nhập: cố định 30 ngày
+  const userExpiryDays = 30;
+
+  const userEmail = (userData.email || "").trim();
+  const isTeacherPartTime =
+    userRoleText.toLowerCase().includes("part-time") ||
+    userRoleText.toLowerCase().includes("parttime");
+  const requiresGoogleDrive = isTeacherPartTime && !userEmail;
+
+  if (requiresGoogleDrive) {
+    redirectUrl = "/connect-google-drive";
+  }
+
+  // 2. Ký token JWT định danh SMH với thời hạn 30 ngày
+  const { token: smhToken, expiryDays, maxAgeSeconds } = await signSmhToken(
+    {
+      userId: userData.id,
+      lmsCode,
+      name: greetingName,
+      role: userRoleText,
+      status: statusText,
+      email: userEmail,
+    },
+    userExpiryDays
+  );
+
   const res = NextResponse.json(
     {
       success: true,
@@ -247,19 +288,42 @@ async function buildLoginSuccessResponse(
         lms_code: lmsCode,
         role: userRoleText, // Text string representation, NOT raw ID
         status: statusText, // Text string representation, NOT raw ID
+        email: userEmail,
+        token_expiry_days: expiryDays,
+        requires_google_drive: requiresGoogleDrive,
       },
-      token: firebaseData.idToken,
+      token: smhToken,
+      id_token: firebaseData.idToken,
       refresh_token: firebaseData.refreshToken,
       redirect_url: redirectUrl,
     },
     { status: 200 }
   );
 
+  // Lưu SMH JWT Token chính thức vào HttpOnly cookie để Middleware xác thực
+  res.cookies.set("smh_token", smhToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
+    path: "/",
+  });
+
+  // Lưu user_email vào cookie cho Client & Middleware tra cứu nhanh
+  res.cookies.set("user_email", encodeURIComponent(userEmail), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
+    path: "/",
+  });
+
   // Store user & Firebase authentication tokens in cookies for future operations
   res.cookies.set("user_id", userData.id, {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
@@ -267,27 +331,31 @@ async function buildLoginSuccessResponse(
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     maxAge: Number(firebaseData.expiresIn) || 3600,
+    sameSite: "lax",
     path: "/",
   });
 
   res.cookies.set("refresh_token", firebaseData.refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
   res.cookies.set("user_name", encodeURIComponent(greetingName), {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
   res.cookies.set("user_role", encodeURIComponent(userRoleText), {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
@@ -295,7 +363,8 @@ async function buildLoginSuccessResponse(
   res.cookies.set("user_permissions", encodeURIComponent(JSON.stringify(userPerms)), {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: maxAgeSeconds,
+    sameSite: "lax",
     path: "/",
   });
 
