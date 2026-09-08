@@ -44,7 +44,9 @@ export async function GET() {
     }
 
     // Join & format user_statuses and roles as text strings without foreign key IDs
-    const formattedUsers = (users || []).map((u: any) => {
+    const formattedUsers = (users || [])
+      .filter((u: any) => u.lms_code !== "__system_maintenance__")
+      .map((u: any) => {
       const statusObj = Array.isArray(u.user_statuses) ? u.user_statuses[0] : u.user_statuses;
       const roleObj = Array.isArray(u.roles) ? u.roles[0] : u.roles;
 

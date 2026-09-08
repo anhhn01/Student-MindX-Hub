@@ -210,7 +210,7 @@ async function buildLoginSuccessResponse(
 
   // Kiểm tra nếu hệ thống đang bật bảo trì thì chỉ Admin mới được đăng nhập
   const { getMaintenanceStatus } = await import("@/lib/services/maintenance-service");
-  const maintenanceStatus = getMaintenanceStatus();
+  const maintenanceStatus = await getMaintenanceStatus();
   if (maintenanceStatus.isEnabled && !rawRoleName.includes("admin")) {
     return NextResponse.json(
       {

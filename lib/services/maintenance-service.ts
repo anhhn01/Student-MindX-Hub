@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { createClient } from "@supabase/supabase-js";
 
 export interface MaintenanceConfig {
   isEnabled: boolean;
@@ -13,99 +14,211 @@ export interface MaintenanceConfig {
 const DATA_DIR = path.join(process.cwd(), "data");
 const STATUS_FILE = path.join(DATA_DIR, "maintenance_status.json");
 
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+
 const DEFAULT_CONFIG: MaintenanceConfig = {
   isEnabled: false,
   expectedEndTime: null,
   reason: "Hệ thống đang được nâng cấp và bảo trì định kỳ.",
   updatedAt: new Date().toISOString(),
-  environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "local",
+  environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "production",
 };
 
+// In-memory cache với TTL 3 giây để tối ưu hiệu năng và độ trễ
+let cachedStatus: MaintenanceConfig | null = null;
+let lastCacheTime = 0;
+const CACHE_TTL_MS = 3000;
+
+// Hằng số định danh bản ghi bảo trì dự phòng trong bảng users
+const MAINTENANCE_FALLBACK_USER_ID = "00000000-0000-0000-0000-000000000001";
+const MAINTENANCE_FALLBACK_LMS_CODE = "__system_maintenance__";
+
 /**
- * Đọc trạng thái bảo trì hiện tại.
- * Tự động kiểm tra nếu đã quá giờ dự kiến thì tự động tắt bảo trì.
+ * Đọc file local (fallback)
  */
-export function getMaintenanceStatus(): MaintenanceConfig {
+function readLocalFile(): MaintenanceConfig | null {
   try {
-    if (!fs.existsSync(STATUS_FILE)) {
-      return { ...DEFAULT_CONFIG };
+    if (fs.existsSync(STATUS_FILE)) {
+      const fileContent = fs.readFileSync(STATUS_FILE, "utf-8");
+      return JSON.parse(fileContent);
     }
-
-    const fileContent = fs.readFileSync(STATUS_FILE, "utf-8");
-    const config: MaintenanceConfig = JSON.parse(fileContent);
-
-    // Kiểm tra hết hạn bảo trì tự động
-    if (config.isEnabled && config.expectedEndTime) {
-      const endTimestamp = new Date(config.expectedEndTime).getTime();
-      if (!isNaN(endTimestamp) && Date.now() >= endTimestamp) {
-        // Đã hết giờ bảo trì, tự động đánh dấu tắt
-        const expiredConfig: MaintenanceConfig = {
-          ...config,
-          isEnabled: false,
-          updatedAt: new Date().toISOString(),
-        };
-        try {
-          fs.writeFileSync(STATUS_FILE, JSON.stringify(expiredConfig, null, 2), "utf-8");
-        } catch {
-          // Bỏ qua lỗi ghi nếu chạy trên môi trường read-only
-        }
-        return expiredConfig;
-      }
-    }
-
-    return config;
-  } catch (error) {
-    console.error("[MaintenanceService] Lỗi khi đọc file trạng thái:", error);
-    return { ...DEFAULT_CONFIG };
-  }
+  } catch (_) {}
+  return null;
 }
 
 /**
- * Cập nhật trạng thái bảo trì.
- * Nếu không cung cấp expectedEndTime, mặc định là 3 tiếng sau thời điểm kích hoạt.
+ * Ghi file local (fallback)
  */
-export function setMaintenanceStatus(
-  isEnabled: boolean,
-  expectedEndTime?: string | null,
-  reason?: string,
-  updatedBy?: string
-): MaintenanceConfig {
+function writeLocalFile(config: MaintenanceConfig): void {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
+    fs.writeFileSync(STATUS_FILE, JSON.stringify(config, null, 2), "utf-8");
+  } catch (_) {}
+}
 
-    let finalEndTime = expectedEndTime;
-
-    // Nếu bật bảo trì mà không điền ngày giờ, mặc định là 3 tiếng sau
-    if (isEnabled) {
-      if (!finalEndTime || finalEndTime.trim() === "") {
-        const threeHoursLater = new Date(Date.now() + 3 * 60 * 60 * 1000);
-        finalEndTime = threeHoursLater.toISOString();
-      } else {
-        // Chuẩn hóa sang ISO string
-        const parsed = new Date(finalEndTime);
-        finalEndTime = isNaN(parsed.getTime())
-          ? new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
-          : parsed.toISOString();
-      }
-    } else {
-      finalEndTime = null;
-    }
-
-    const newConfig: MaintenanceConfig = {
-      isEnabled,
-      expectedEndTime: finalEndTime,
-      reason: reason || "Hệ thống đang được nâng cấp và bảo trì định kỳ.",
-      updatedAt: new Date().toISOString(),
-      updatedBy: updatedBy || "admin",
-      environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "local",
-    };
-
-    fs.writeFileSync(STATUS_FILE, JSON.stringify(newConfig, null, 2), "utf-8");
-    return newConfig;
-  } catch (error) {
-    console.error("[MaintenanceService] Lỗi khi cập nhật trạng thái bảo trì:", error);
-    throw error;
+/**
+ * Đọc trạng thái bảo trì hiện tại từ Supabase Database (hoặc Cache / File local)
+ */
+export async function getMaintenanceStatus(): Promise<MaintenanceConfig> {
+  const now = Date.now();
+  if (cachedStatus && now - lastCacheTime < CACHE_TTL_MS) {
+    return checkExpiration(cachedStatus);
   }
+
+  // 1. Thử lấy từ bảng system_settings trong Supabase
+  try {
+    const { data: settingRow, error: settingError } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "maintenance_status")
+      .maybeSingle();
+
+    if (!settingError && settingRow && settingRow.value) {
+      const config: MaintenanceConfig = settingRow.value;
+      cachedStatus = config;
+      lastCacheTime = now;
+      writeLocalFile(config);
+      return checkExpiration(config);
+    }
+  } catch (_) {}
+
+  // 2. Thử lấy từ bản ghi dự phòng __system_maintenance__ trong bảng users
+  try {
+    const { data: userRow, error: userError } = await supabase
+      .from("users")
+      .select("password_hash")
+      .eq("lms_code", MAINTENANCE_FALLBACK_LMS_CODE)
+      .maybeSingle();
+
+    if (!userError && userRow && userRow.password_hash) {
+      const config: MaintenanceConfig = JSON.parse(userRow.password_hash);
+      cachedStatus = config;
+      lastCacheTime = now;
+      writeLocalFile(config);
+      return checkExpiration(config);
+    }
+  } catch (_) {}
+
+  // 3. Fallback đọc file local
+  const local = readLocalFile();
+  if (local) {
+    cachedStatus = local;
+    lastCacheTime = now;
+    return checkExpiration(local);
+  }
+
+  cachedStatus = { ...DEFAULT_CONFIG };
+  lastCacheTime = now;
+  return DEFAULT_CONFIG;
+}
+
+/**
+ * Kiểm tra xem bảo trì đã hết hạn chưa. Nếu đã quá expectedEndTime thì tự động tắt.
+ */
+function checkExpiration(config: MaintenanceConfig): MaintenanceConfig {
+  if (config.isEnabled && config.expectedEndTime) {
+    const endTimestamp = new Date(config.expectedEndTime).getTime();
+    if (!isNaN(endTimestamp) && Date.now() >= endTimestamp) {
+      const expiredConfig: MaintenanceConfig = {
+        ...config,
+        isEnabled: false,
+        updatedAt: new Date().toISOString(),
+      };
+      cachedStatus = expiredConfig;
+      lastCacheTime = Date.now();
+      writeLocalFile(expiredConfig);
+      // Tự động cập nhật ngầm sang Supabase nếu hết hạn
+      setMaintenanceStatus(false, null, config.reason, "auto_expire").catch(() => {});
+      return expiredConfig;
+    }
+  }
+  return config;
+}
+
+/**
+ * Cập nhật trạng thái bảo trì.
+ * Lưu đồng thời vào Supabase (system_settings & fallback users), bộ nhớ cache và file local.
+ */
+export async function setMaintenanceStatus(
+  isEnabled: boolean,
+  expectedEndTime?: string | null,
+  reason?: string,
+  updatedBy?: string
+): Promise<MaintenanceConfig> {
+  let finalEndTime = expectedEndTime;
+
+  if (isEnabled) {
+    if (!finalEndTime || finalEndTime.trim() === "") {
+      const threeHoursLater = new Date(Date.now() + 3 * 60 * 60 * 1000);
+      finalEndTime = threeHoursLater.toISOString();
+    } else {
+      const parsed = new Date(finalEndTime);
+      finalEndTime = isNaN(parsed.getTime())
+        ? new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+        : parsed.toISOString();
+    }
+  } else {
+    finalEndTime = null;
+  }
+
+  const newConfig: MaintenanceConfig = {
+    isEnabled,
+    expectedEndTime: finalEndTime,
+    reason: reason || "Hệ thống đang được nâng cấp và bảo trì định kỳ.",
+    updatedAt: new Date().toISOString(),
+    updatedBy: updatedBy || "admin",
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "production",
+  };
+
+  // Cập nhật Cache và File local ngay lập tức
+  cachedStatus = newConfig;
+  lastCacheTime = Date.now();
+  writeLocalFile(newConfig);
+
+  // 1. Lưu vào bảng system_settings trong Supabase
+  let savedToSystemSettings = false;
+  try {
+    const { error: upsertError } = await supabase
+      .from("system_settings")
+      .upsert({
+        key: "maintenance_status",
+        value: newConfig,
+        updated_at: newConfig.updatedAt,
+        updated_by: newConfig.updatedBy,
+      });
+
+    if (!upsertError) {
+      savedToSystemSettings = true;
+    }
+  } catch (_) {}
+
+  // 2. Lưu vào bản ghi dự phòng trong bảng users nếu system_settings chưa sẵn sàng
+  try {
+    // Tìm 1 role_id và status_id hợp lệ
+    const { data: roleRow } = await supabase.from("roles").select("id").limit(1).maybeSingle();
+    const { data: statusRow } = await supabase.from("user_statuses").select("id").limit(1).maybeSingle();
+
+    if (roleRow && statusRow) {
+      await supabase.from("users").upsert({
+        id: MAINTENANCE_FALLBACK_USER_ID,
+        lms_code: MAINTENANCE_FALLBACK_LMS_CODE,
+        password_hash: JSON.stringify(newConfig),
+        full_name: "System Maintenance State",
+        role_id: roleRow.id,
+        status_id: statusRow.id,
+        updated_at: newConfig.updatedAt,
+      });
+    }
+  } catch (userSaveErr) {
+    console.warn("[MaintenanceService] Fallback save to users table note:", userSaveErr);
+  }
+
+  return newConfig;
 }

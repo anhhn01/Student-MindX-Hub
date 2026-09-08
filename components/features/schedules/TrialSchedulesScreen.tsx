@@ -624,24 +624,21 @@ export default function TrialSchedulesScreen({ user: initialUser }: { user?: Use
         )}
 
         {/* Header & Thanh Điều Khiển */}
-        <div className="bg-white dark:bg-[#0E131F] p-4 sm:p-5 lg:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+        <div className="bg-white dark:bg-[#0B0F17] p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800/80 shadow-sm transition-colors">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
             {/* Tiêu đề */}
             <div className="space-y-1">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-600 to-rose-700 text-white shadow-md shadow-rose-500/20 shrink-0">
-                  <CalendarCheck className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0">
+                  <CalendarCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
+                  <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white flex flex-wrap items-center gap-2 uppercase">
                     <span>Lịch Trải Nghiệm</span>
-                    <span className="text-slate-400 font-normal hidden sm:inline">(Office Hours)</span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap">
-                      Live LMS
-                    </span>
+                    <span className="text-slate-400 font-normal hidden sm:inline text-sm">(Office Hours)</span>
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    Danh sách ca học trải nghiệm tại các cơ sở trực thuộc (đã lọc bỏ ca Makeup / Bù)
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Danh sách ca học trải nghiệm theo cơ sở trực thuộc
                   </p>
                 </div>
               </div>

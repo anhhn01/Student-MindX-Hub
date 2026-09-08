@@ -6,17 +6,15 @@ import {
   ShieldAlert,
   HardDrive,
   LogOut,
-  Sparkles,
   AlertCircle,
-  ExternalLink,
-  CheckCircle2,
   Lock,
   ArrowRight,
 } from "lucide-react";
 import { SMHLogo } from "@/components/brand/SMHLogo";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import SystemFooter from "@/components/layout/SystemFooter";
-import { API_ROUTES } from "@/lib/constants/api-routes";
+import { API_ROUTES, getRoleSlug } from "@/lib/constants/api-routes";
+import { supabase } from "@/lib/supabase/client";
 
 function ConnectGoogleDriveContent() {
   const router = useRouter();
@@ -27,14 +25,13 @@ function ConnectGoogleDriveContent() {
   const [checkingConfig, setCheckingConfig] = useState(true);
   const [configured, setConfigured] = useState(true);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
-  const [configMessage, setConfigMessage] = useState<string | null>(null);
 
   const [userData, setUserData] = useState<{
     name: string;
     role: string;
     lms_code?: string;
   }>({
-    name: "Giáo viên Part-time",
+    name: "Giáo viên",
     role: "Teacher Part-time",
     lms_code: "",
   });
@@ -48,30 +45,29 @@ function ConnectGoogleDriveContent() {
       .then((res) => res.json())
       .then((data) => {
         if (data.authenticated && data.user) {
+          const roleName = data.user.role || "Teacher Part-time";
           setUserData({
-            name: data.user.name || "Giáo viên Part-time",
-            role: data.user.role || "Teacher Part-time",
+            name: data.user.name || "Giáo viên",
+            role: roleName,
             lms_code: data.user.lms_code || "",
           });
 
-          // Nếu tài khoản này đã có email (đã liên kết xong), tự động chuyển về dashboard
+          // Nếu tài khoản này đã có email (đã liên kết xong), tự động chuyển về đúng dashboard của vai trò
           if (data.user.email && !data.user.requires_google_drive) {
-            router.replace("/teacher-parttime/dashboard");
+            const roleSlug = getRoleSlug(roleName);
+            router.replace(`/${roleSlug}/dashboard`);
           }
         }
       })
       .catch(() => {});
 
-    // 2. Lấy URL OAuth và kiểm tra xem biến môi trường đã được điền chưa
+    // 2. Lấy URL OAuth
     fetch("/api/auth/google/url", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         setConfigured(!!data.configured);
         if (data.url) {
           setAuthUrl(data.url);
-        }
-        if (data.message) {
-          setConfigMessage(data.message);
         }
       })
       .catch((err) => {
@@ -82,23 +78,37 @@ function ConnectGoogleDriveContent() {
       });
   }, [router]);
 
-  const handleConnectClick = () => {
+  const handleConnectClick = async () => {
+    setLoading(true);
+
+    // 1. Thử ưu tiên đăng nhập OAuth qua Supabase Auth nếu được kích hoạt
+    try {
+      const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      const { data: sbData, error: sbError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${redirectOrigin}/api/auth/google/callback`,
+          scopes: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
+        },
+      });
+
+      if (!sbError && sbData?.url) {
+        window.location.href = sbData.url;
+        return;
+      }
+    } catch (_) {}
+
+    // 2. Sử dụng Google OAuth URL trực tiếp từ hệ thống
     if (authUrl) {
-      setLoading(true);
       window.location.href = authUrl;
     } else {
-      // Thử gọi lại API lấy URL
-      setLoading(true);
       fetch("/api/auth/google/url")
         .then((res) => res.json())
         .then((data) => {
           if (data.url) {
             window.location.href = data.url;
           } else {
-            alert(
-              data.message ||
-                "Chưa cấu hình GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET trong file .env. Vui lòng kiểm tra lại."
-            );
+            alert(data.message || "Chưa cấu hình Google OAuth credentials.");
             setLoading(false);
           }
         })
@@ -115,6 +125,14 @@ function ConnectGoogleDriveContent() {
     } catch (_) {}
     window.location.href = "/login";
   };
+
+  const isFullTime =
+    userData.role.toLowerCase().includes("full-time") ||
+    userData.role.toLowerCase().includes("fulltime");
+
+  const badgeClass = isFullTime
+    ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30"
+    : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30";
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#090D16] text-slate-900 dark:text-slate-100 transition-colors duration-300 font-sans">
@@ -148,7 +166,6 @@ function ConnectGoogleDriveContent() {
                 {/* Outer Ring */}
                 <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-rose-500/20 to-amber-500/20 border border-rose-500/30 flex items-center justify-center shadow-lg shadow-rose-500/10">
                   <div className="w-14 h-14 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 flex items-center justify-center">
-                    {/* Google Drive Inspired Tri-color SVG */}
                     <svg className="w-8 h-8" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
                       <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
                       <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
@@ -172,11 +189,11 @@ function ConnectGoogleDriveContent() {
                 <span>Yêu Cầu Bắt Buộc</span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white leading-tight uppercase">
                 Liên Kết Google Drive
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md">
-                Kích hoạt địa chỉ Email và đồng bộ tài nguyên giảng dạy MindX Hub
+                Kích hoạt địa chỉ Email và đồng bộ tài nguyên giảng dạy
               </p>
             </div>
 
@@ -187,7 +204,7 @@ function ConnectGoogleDriveContent() {
                 <div>
                   <p className="font-bold">Liên kết chưa thành công</p>
                   <p className="mt-0.5 opacity-90">
-                    Mã lỗi: <span className="font-mono">{errorParam}</span>. Vui lòng thử lại hoặc liên hệ quản trị viên.
+                    Mã lỗi: <span className="font-mono">{errorParam}</span>. Vui lòng thử lại.
                   </p>
                 </div>
               </div>
@@ -208,41 +225,16 @@ function ConnectGoogleDriveContent() {
                       {userData.name}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                      Mã LMS: <span className="font-semibold text-slate-700 dark:text-slate-300">{userData.lms_code || "huynhnhatanh"}</span>
+                      Mã LMS: <span className="font-semibold text-slate-700 dark:text-slate-300">{userData.lms_code || "—"}</span>
                     </p>
                   </div>
                 </div>
 
-                <span className="px-2.5 py-1 text-[11px] font-bold rounded-lg border bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30 whitespace-nowrap shrink-0">
+                <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border whitespace-nowrap shrink-0 ${badgeClass}`}>
                   {userData.role}
                 </span>
               </div>
             </div>
-
-            {/* Explanation Note */}
-            <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
-              <p className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
-                <Sparkles className="w-4 h-4 shrink-0" />
-                Tại sao cần liên kết Google Drive?
-              </p>
-              <p className="mt-1">
-                Tài khoản Giảng viên Part-time của bạn hiện đang để trống trường <strong>Email</strong> trong cơ sở dữ liệu. Sau khi liên kết, hệ thống sẽ tự động cập nhật Email từ Google của bạn vào hồ sơ và cấp quyền truy cập toàn bộ các tính năng.
-              </p>
-            </div>
-
-            {/* Warning if OAuth credentials are not configured */}
-            {!configured && !checkingConfig && (
-              <div className="mt-4 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-800 dark:text-rose-200">
-                <p className="font-bold flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
-                  Chờ Cấu Hình Khóa Google OAuth
-                </p>
-                <p className="mt-1 leading-relaxed">
-                  {configMessage ||
-                    "Quản trị viên vui lòng cập nhật GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET trong file .env để kích hoạt nút liên kết."}
-                </p>
-              </div>
-            )}
 
             {/* Action Buttons */}
             <div className="mt-6 space-y-3">
