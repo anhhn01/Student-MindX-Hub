@@ -1,6 +1,91 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySmhToken } from "@/lib/auth/jwt";
 
+// In-memory cache kiểm tra trạng thái bảo trì trong Middleware với TTL 3 giây
+let middlewareMaintenanceCache: { isEnabled: boolean; expiresAt: number } | null = null;
+
+async function checkMaintenanceMode(): Promise<boolean> {
+  const now = Date.now();
+  if (middlewareMaintenanceCache && now < middlewareMaintenanceCache.expiresAt) {
+    return middlewareMaintenanceCache.isEnabled;
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || "https://ntwxyemjtjosfzmribok.supabase.co";
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    "sb_publishable_H4h3U8_R3OwV_FbrPKT_RA_XtTpQ2VY";
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+    // 1. Thử lấy từ bảng system_settings
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/system_settings?key=eq.maintenance_status&select=value`,
+      {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        signal: controller.signal,
+        cache: "no-store",
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0 && data[0]?.value) {
+        const val = data[0].value;
+        // Kiểm tra hết hạn tự động
+        if (val.isEnabled && val.expectedEndTime) {
+          const endTs = new Date(val.expectedEndTime).getTime();
+          if (!isNaN(endTs) && Date.now() >= endTs) {
+            middlewareMaintenanceCache = { isEnabled: false, expiresAt: now + 3000 };
+            return false;
+          }
+        }
+        const isEnabled = Boolean(val.isEnabled);
+        middlewareMaintenanceCache = { isEnabled, expiresAt: now + 3000 };
+        return isEnabled;
+      }
+    }
+
+    // 2. Fallback: Lấy từ bảng users row __system_maintenance__
+    const fallbackRes = await fetch(
+      `${supabaseUrl}/rest/v1/users?lms_code=eq.__system_maintenance__&select=password_hash`,
+      {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (fallbackRes.ok) {
+      const fData = await fallbackRes.json();
+      if (Array.isArray(fData) && fData.length > 0 && fData[0]?.password_hash) {
+        const val = JSON.parse(fData[0].password_hash);
+        if (val.isEnabled && val.expectedEndTime) {
+          const endTs = new Date(val.expectedEndTime).getTime();
+          if (!isNaN(endTs) && Date.now() >= endTs) {
+            middlewareMaintenanceCache = { isEnabled: false, expiresAt: now + 3000 };
+            return false;
+          }
+        }
+        const isEnabled = Boolean(val.isEnabled);
+        middlewareMaintenanceCache = { isEnabled, expiresAt: now + 3000 };
+        return isEnabled;
+      }
+    }
+  } catch (_) {}
+
+  return false;
+}
+
 export async function middleware(request: NextRequest) {
   const smhToken = request.cookies.get("smh_token")?.value;
   const idToken = request.cookies.get("id_token")?.value;
@@ -34,7 +119,8 @@ export async function middleware(request: NextRequest) {
   }
 
   const isTeacherPartTime = userRole.includes("part-time") || userRole.includes("parttime");
-  const isPartTimeMissingEmail = isTeacherPartTime && (!userEmail || userEmail === "");
+  const isTeacherFullTime = userRole.includes("full-time") || userRole.includes("fulltime");
+  const isTeacherMissingEmail = (isTeacherPartTime || isTeacherFullTime) && (!userEmail || userEmail === "");
 
   // Xác định dashboard chuẩn dựa theo vai trò của người dùng
   const getRoleDashboard = (role: string) => {
@@ -53,36 +139,28 @@ export async function middleware(request: NextRequest) {
   ) {
     const isAdmin = userRole.includes("admin");
     if (!isAdmin) {
-      try {
-        const mRes = await fetch(new URL("/api/admin/maintenance", request.url), {
-          headers: { "x-internal-check": "1" },
-          cache: "no-store",
-        });
-        if (mRes.ok) {
-          const mData = await mRes.json();
-          if (mData?.data?.isEnabled) {
-            // Khi bảo trì bật: Toàn bộ người dùng (kể cả vào /login thường) đều chuyển thẳng sang /maintenance.
-            // Chỉ ngoại lệ duy nhất khi Admin nhấp 'Quản trị viên đăng nhập' (/login?admin=1)
-            const isAdminLogin = pathname.startsWith("/login") && request.nextUrl.searchParams.get("admin") === "1";
-            if (!isAdminLogin) {
-              return NextResponse.redirect(new URL("/maintenance", request.url));
-            }
-          }
+      const isMaintenanceActive = await checkMaintenanceMode();
+      if (isMaintenanceActive) {
+        // Khi bảo trì bật: Toàn bộ người dùng (kể cả vào /login thường) đều chuyển thẳng sang /maintenance.
+        // Chỉ ngoại lệ duy nhất khi Admin nhấp 'Quản trị viên đăng nhập' (/login?admin=1)
+        const isAdminLogin = pathname.startsWith("/login") && request.nextUrl.searchParams.get("admin") === "1";
+        if (!isAdminLogin) {
+          return NextResponse.redirect(new URL("/maintenance", request.url));
         }
-      } catch (_) {}
+      }
     }
   }
 
   // 1. Đã đăng nhập nhưng lại truy cập trang /login -> tự điều hướng về dashboard (hoặc connect-google-drive nếu thiếu email)
   if (isAuthenticated && pathname.startsWith("/login")) {
-    if (isPartTimeMissingEmail) {
+    if (isTeacherMissingEmail) {
       return NextResponse.redirect(new URL("/connect-google-drive", request.url));
     }
     return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
   }
 
-  // 1.5 BẮT BUỘC OAUTH GOOGLE DRIVE: Teacher Part-time mà email đang trống bắt buộc phải liên kết trước khi truy cập bất kỳ route nào khác
-  if (isAuthenticated && isPartTimeMissingEmail) {
+  // 1.5 BẮT BUỘC OAUTH GOOGLE DRIVE: Teacher Full-time hoặc Part-time mà email đang trống bắt buộc phải liên kết trước khi truy cập bất kỳ route nào khác
+  if (isAuthenticated && isTeacherMissingEmail) {
     const isAllowedOAuthPath =
       pathname.startsWith("/connect-google-drive") ||
       pathname.startsWith("/api/auth/google") ||
@@ -97,7 +175,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Nếu tài khoản đã có email hợp lệ mà vẫn vào /connect-google-drive -> Điều hướng về dashboard
-  if (isAuthenticated && !isPartTimeMissingEmail && pathname.startsWith("/connect-google-drive")) {
+  if (isAuthenticated && !isTeacherMissingEmail && pathname.startsWith("/connect-google-drive")) {
     return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
   }
 
@@ -137,8 +215,6 @@ export async function middleware(request: NextRequest) {
   // 3. Chặn route và phân quyền theo vai trò (Strict Role & Permissions Guarding)
   if (isAuthenticated) {
     const isAdmin = userRole.includes("admin");
-    const isTeacherFullTime = userRole.includes("full-time") || userRole.includes("fulltime");
-    const isTeacherPartTime = userRole.includes("part-time") || userRole.includes("parttime");
 
     // Đọc phân quyền màn hình từ cookie user_permissions
     const rawPerms = request.cookies.get("user_permissions")?.value;
@@ -207,13 +283,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/admin/:path*",
-    "/teacher-fulltime/:path*",
-    "/teacher-parttime/:path*",
-    "/profile/:path*",
-    "/dashboard/:path*",
-    "/connect-google-drive",
-    "/login",
-    "/",
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

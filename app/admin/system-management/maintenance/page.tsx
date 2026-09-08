@@ -123,11 +123,11 @@ export default function MaintenanceManagementPage() {
                 <Wrench className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">
                   QUẢN LÝ BẢO TRÌ HỆ THỐNG
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                  Kiểm soát trạng thái bảo trì. Khi bật, chỉ Quản trị viên mới được phép truy cập.
+                  Kiểm soát trạng thái kích hoạt bảo trì toàn hệ thống
                 </p>
               </div>
             </div>
@@ -171,20 +171,6 @@ export default function MaintenanceManagementPage() {
           </div>
         )}
 
-        {/* Environment Isolation Banner */}
-        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-2xl p-4 sm:p-5 flex items-start sm:items-center gap-3 text-xs sm:text-sm text-amber-800 dark:text-amber-300">
-          <Laptop className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5 sm:mt-0" />
-          <div className="flex-1 leading-relaxed">
-            <span className="font-bold">Môi trường thực thi hiện tại: </span>
-            <span className="font-mono uppercase px-2 py-0.5 rounded-md bg-amber-200/60 dark:bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-500/40 text-xs font-semibold">
-              {environment}
-            </span>
-            <span className="ml-2 text-amber-700 dark:text-amber-200/90">
-              Cơ chế bảo trì được cách ly theo môi trường. Thao tác tại đây chỉ áp dụng cho máy cục bộ (Local) và tuyệt đối không ảnh hưởng tới Production trên Vercel.
-            </span>
-          </div>
-        </div>
-
         {/* Main Settings Card */}
         <div className="bg-white dark:bg-[#0B0F17] border border-slate-200 dark:border-slate-800/80 rounded-3xl p-5 sm:p-8 space-y-6 shadow-sm">
           {/* Toggle Switch */}
@@ -205,9 +191,6 @@ export default function MaintenanceManagementPage() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Khi bật, mọi người dùng không phải Quản trị viên truy cập vào website sẽ tự động được điều hướng đến trang thông báo bảo trì.
-              </p>
             </div>
 
             {/* Custom Toggle Switch */}

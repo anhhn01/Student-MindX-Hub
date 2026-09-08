@@ -394,11 +394,11 @@ export default function UserManagementScreen() {
               <Users className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white truncate">
-                Danh Sách Tài Khoản
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white truncate uppercase">
+                Quản Lý Tài Khoản
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Tổng cộng {filteredUsers.length} tài khoản trong hệ thống
+                Danh sách và phân quyền tài khoản người dùng trong hệ thống
               </p>
             </div>
           </div>

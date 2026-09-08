@@ -4,7 +4,7 @@ import { verifySmhToken } from "@/lib/auth/jwt";
 
 export async function GET() {
   try {
-    const status = getMaintenanceStatus();
+    const status = await getMaintenanceStatus();
     return NextResponse.json({ success: true, data: status });
   } catch (error: any) {
     return NextResponse.json(
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { isEnabled, expectedEndTime, reason } = body;
 
-    const updatedConfig = setMaintenanceStatus(
+    const updatedConfig = await setMaintenanceStatus(
       Boolean(isEnabled),
       expectedEndTime || null,
       reason,

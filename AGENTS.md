@@ -90,12 +90,12 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
     - Đảm bảo tính responsive 100% trên cả thiết bị di động lẫn máy tính để bàn.
     - Tích hợp **chấm tròn màu xanh nhấp nháy (pulsing green dot)** hiệu ứng `animate-ping` biểu thị trạng thái hoạt động trực tiếp theo thời gian thực (live activity).
     - Hiển thị số lượt truy cập trang web thực tế được định dạng chuẩn Việt Nam (ví dụ: `1.431 lượt truy cập`), kết hợp cơ chế lưu trữ bền vững tại `data/site_stats.json`.
-25. **Quy Chuẩn Chế Độ Bảo Trì Hệ Thống & Màn Hình Bảo Trì Cố Định (Maintenance Mode & Persistent Screen Standard)**:
+25. **Quy Chuẩn Chế Độ Bảo Trì Hệ Thống Đa Môi Trường & Màn Hình Bảo Trì Cố Định (Production Persistent Maintenance Mode Standard)**:
     - Quản trị viên (Admin) quản lý bảo trì tại `/[role]/system-management/maintenance`.
+    - **Lưu trữ bền vững trên Production qua Supabase Database**: Trạng thái bảo trì được lưu trữ bền vững tại bảng `system_settings` trên Supabase (kèm cơ chế fallback bản ghi hệ thống `__system_maintenance__` trong `users` và bộ đệm in-memory TTL 3s). Nhờ vậy trên môi trường Production (như Vercel serverless), `middleware.ts` truy vấn trực tiếp Supabase REST API và chặn 100% người dùng các role khác về trang `/maintenance` một cách triệt để, không bị ảnh hưởng bởi tính vô trạng thái của serverless filesystem.
     - **Màn hình bảo trì xuất hiện đầu tiên & cố định liên tục**: Khi kích hoạt bảo trì, toàn bộ người dùng (kể cả truy cập Trang chủ `/` hay `/login` thông thường) đều bị Middleware chuyển hướng ngay lập tức về trang `/maintenance` và lưu lại ở đó liên tục cho đến khi bảo trì kết thúc. Tuyệt đối không chỉ hiển thị một thông báo thông thường rồi cho ở lại trang khác.
     - **Kênh đăng nhập đặc thù cho Quản trị viên**: Trên trang `/maintenance`, chỉ Quản trị viên mới có thể nhấp nút "Quản trị viên đăng nhập" (`/login?admin=1`) để truy cập form đăng nhập quản trị. Nếu tài khoản không phải Admin cố tình đăng nhập trong thời gian bảo trì, hệ thống từ chối và điều hướng ngay về `/maintenance`.
-    - Hỗ trợ ô nhập ngày giờ dự kiến kết thúc (`datetime-local`). Nếu để trống, hệ thống tự động thiết lập mặc định là **3 tiếng** kể từ thời điểm bật.
-    - **Cách ly môi trường 100%**: Việc bật/tắt bảo trì trên máy cục bộ (Local) lưu trong `data/maintenance_status.json` (được bảo vệ bởi `.gitignore`), tuyệt đối không làm ảnh hưởng hay gián đoạn hệ thống trên môi trường Production.
+    - Hỗ trợ ô nhập ngày giờ dự kiến kết thúc (`datetime-local`). Nếu để trống, hệ thống tự động thiết lập mặc định là **3 tiếng** kể từ thời điểm bật. Khi quá thời gian dự kiến, hệ thống tự động mở khóa bảo trì.
 26. **Quy Chuẩn Quản Lý Nhật Ký Phiên Bản Mới Nhất (Single Latest Version Changelog Standard)**:
     - Quản lý phiên bản tập trung duy nhất tại `lib/constants/version.ts` (`CURRENT_VERSION`).
     - Trang Changelog (`/changelog`) **chỉ hiển thị duy nhất 1 phiên bản mới nhất**, tóm tắt các tính năng chính một cách tinh gọn, dễ hiểu, không dùng thuật ngữ kỹ thuật quá chuyên môn.
@@ -115,11 +115,17 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
       - Khi ở Trang chủ: Nút nổi bật gradient Đỏ Ruby (`from-rose-600 to-red-600`) đổ bóng với icon `LayoutDashboard` và chữ **"Về Bảng Điều Khiển"**.
       - Khi ở Dashboard / màn hình quản lý: Thẻ bo tròn viền tinh tế với icon `Home` màu Rose và chữ **"Xem Trang Chủ"**.
       - Hỗ trợ đầy đủ trạng thái mở rộng (288px) lẫn thu gọn (80px) kèm tooltip.
-30. **Quy Chuẩn Bắt Buộc Liên Kết Google Drive Đối Với Teacher Part-time (Mandatory Google Drive OAuth for Part-time Teachers Standard)**:
-    - Áp dụng đối với mọi tài khoản có vai trò `Teacher Part-time` mà trường `email` trong bảng `users` Supabase đang rỗng (`NULL` hoặc `""`).
+30. **Quy Chuẩn Bắt Buộc Liên Kết Google Drive Đối Với Giảng Viên (Mandatory Google Drive OAuth for Teachers Standard)**:
+    - Áp dụng đối với các tài khoản vai trò Giảng viên (`Teacher Part-time` và `Teacher Full-time`) mà trường `email` trong bảng `users` Supabase đang rỗng (`NULL` hoặc `""`).
     - Khi đăng nhập hoặc truy cập bất kỳ route nào trong hệ thống, Middleware tự động chặn và chuyển hướng bắt buộc về `/connect-google-drive`.
-    - Người dùng không được phép truy cập bất kỳ tính năng nào khác cho đến khi hoàn tất liên kết Google Drive qua OAuth (scopes: `drive.file`, `userinfo.email`, `userinfo.profile`).
-    - Sau khi xác thực Google thành công, email nhận được từ Google được lưu trực tiếp vào bảng `users.email` trong Supabase và lưu token Google Drive an toàn tại `data/google_drive_tokens.json`. Hệ thống cấp lại JWT `smh_token` có chứa email để mở khóa toàn bộ quyền truy cập.
+    - Hỗ trợ cả Google OAuth truyền thống và Supabase Auth OAuth (`supabase.auth.signInWithOAuth`).
+    - Sau khi xác thực Google thành công, email nhận được từ Google được lưu trực tiếp vào bảng `users.email` trong Supabase và lưu token Google Drive an toàn tại `data/google_drive_tokens.json`. Hệ thống cấp lại JWT `smh_token` có chứa email và điều hướng động về đúng Dashboard tương ứng với vai trò của người dùng (`/${roleSlug}/dashboard`), tuyệt đối không hardcode một vai trò cố định.
+31. **Quy Chuẩn Thống Nhất Bố Cục Giao Diện Mọi Menu & Triệt Tiêu Văn Bản Giải Thích (Unified Menu Layout & Zero Explanatory Text Standard)**:
+    - **Thẻ Tiêu Đề Thống Nhất (Unified Page Header Card)**: Mọi màn hình menu chức năng (Quản lý tài khoản, Phân quyền, Cơ sở trực thuộc, Lịch trải nghiệm, Bảo trì hệ thống, Hồ sơ cá nhân) bắt buộc sử dụng thẻ tiêu đề đồng bộ cấu trúc:
+      - Container: `bg-white dark:bg-[#0B0F17] rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800/80 p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4`.
+      - Khối Tiêu đề: Khung icon đại diện kích thước chuẩn `w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20`, tiêu đề in hoa đậm (`font-black tracking-wide text-xl sm:text-2xl`), và phụ đề ngắn gọn 1 dòng súc tích (`text-xs sm:text-sm text-slate-500 dark:text-slate-400`).
+      - Khối Hành động: Đặt toàn bộ các nút thao tác nghiệp vụ, nút làm mới, nút thêm mới gọn gàng ở phía bên phải.
+    - **Tuyệt Đối Không Thêm Văn Bản / Ghi Chú Giải Thích Hướng Dẫn**: Không được phép tự ý thêm các khối ghi chú, hộp cảnh báo, banner hướng dẫn dài dòng ("Tại sao cần làm...", "Lưu ý khi sử dụng...", "👉 Vuốt ngang để xem...") vào bất kỳ màn hình nào trừ khi có yêu cầu cụ thể từ người dùng. Giao diện phải sạch sẽ, tinh gọn, tập trung hoàn toàn vào dữ liệu và tác vụ.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

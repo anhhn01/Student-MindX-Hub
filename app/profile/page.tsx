@@ -18,6 +18,8 @@ import {
   Calendar,
   Sparkles,
   ShieldCheck,
+  UserCheck,
+  RefreshCw,
 } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 
@@ -165,6 +167,34 @@ export default function ProfilePage() {
       ]}
     >
       <div className="space-y-6">
+        {/* Unified Page Header Bar */}
+        <div className="bg-white dark:bg-[#0B0F17] rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800/80 p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0">
+              <UserCheck className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white truncate uppercase">
+                Hồ Sơ Cá Nhân
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Quản lý thông tin định danh và bảo mật tài khoản
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={fetchProfile}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors whitespace-nowrap cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-rose-500" : ""}`} />
+              <span>Làm mới</span>
+            </button>
+          </div>
+        </div>
+
         {/* Feedback Alert */}
         {feedback && (
           <div

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { saveGoogleDriveTokens } from "@/lib/services/google-drive-service";
 import { signSmhToken, verifySmhToken } from "@/lib/auth/jwt";
+import { getRoleSlug } from "@/lib/constants/api-routes";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -153,7 +154,7 @@ export async function GET(request: NextRequest) {
     if (userId) {
       const { data: dbUser } = await supabase
         .from("users")
-        .select("lms_code, full_name, user_statuses(name)")
+        .select("lms_code, full_name, user_statuses(name), roles(name)")
         .eq("id", userId)
         .maybeSingle();
 
@@ -164,23 +165,33 @@ export async function GET(request: NextRequest) {
           ? dbUser.user_statuses[0]
           : dbUser.user_statuses;
         status = (statusObj as any)?.name || status;
+
+        const roleObj = Array.isArray(dbUser.roles)
+          ? dbUser.roles[0]
+          : dbUser.roles;
+        if ((roleObj as any)?.name) {
+          role = (roleObj as any).name;
+        }
       }
     }
+
+    const finalRole = role || "Teacher Part-time";
+    const roleSlug = getRoleSlug(finalRole);
 
     const { token: newSmhToken, maxAgeSeconds } = await signSmhToken(
       {
         userId,
         lmsCode,
         name,
-        role: role || "Teacher Part-time",
+        role: finalRole,
         status,
         email: googleEmail,
       },
       30
     );
 
-    // Xác định đích chuyển tiếp: Teacher Part-time dashboard
-    const targetDashboard = "/teacher-parttime/dashboard?connected=drive_success";
+    // Xác định đích chuyển tiếp theo đúng vai trò: Teacher Full-time hoặc Part-time
+    const targetDashboard = `/${roleSlug}/dashboard?connected=drive_success`;
     const response = NextResponse.redirect(new URL(targetDashboard, origin));
 
     // Cập nhật cookies
@@ -193,6 +204,14 @@ export async function GET(request: NextRequest) {
     });
 
     response.cookies.set("user_email", encodeURIComponent(googleEmail), {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: maxAgeSeconds,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    response.cookies.set("user_role", encodeURIComponent(finalRole), {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       maxAge: maxAgeSeconds,

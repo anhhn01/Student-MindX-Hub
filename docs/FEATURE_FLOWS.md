@@ -775,42 +775,43 @@ sequenceDiagram
 
 ---
 
-## 18. Luồng Bắt Buộc Liên Kết Google Drive Cho Teacher Part-Time (Mandatory Google Drive OAuth Flow)
+## 18. Luồng Bắt Buộc Liên Kết Google Drive Cho Giảng Viên (Mandatory Google Drive OAuth Flow)
 
 ### 18.1 Mục Đích & Điều Kiện Kích Hoạt
-1. **Đối tượng áp dụng**: Tài khoản có vai trò `Teacher Part-time` (chứa `part-time` hoặc `parttime`).
+1. **Đối tượng áp dụng**: Tài khoản có vai trò Giảng viên (`Teacher Part-time` hoặc `Teacher Full-time`).
 2. **Điều kiện kích hoạt**: Thuộc tính `email` trong bảng `users` tại cơ sở dữ liệu Supabase đang để trống (`NULL` hoặc rỗng `""`).
 3. **Hành vi cưỡng chế (Strict Enforcement)**:
    - Khi tài khoản đăng nhập thành công qua `/api/auth/login`, hệ thống phát hiện email trống và trả về `requires_google_drive: true` kèm `redirect_url: "/connect-google-drive"`.
    - Tại tầng **Middleware (`middleware.ts`)**: Mọi yêu cầu truy cập đến bất kỳ route nào (Dashboard, Trang chủ, Quản lý...) từ tài khoản này đều bị tự động chặn lại và chuyển hướng (Redirect 307) về màn hình `/connect-google-drive`.
    - Các ngoại lệ duy nhất được phép đi qua: `/connect-google-drive`, `/api/auth/google/*`, `/api/auth/logout`, `/login`, tài nguyên tĩnh `/_next` và favicon.
+4. **Hỗ trợ 2 phương thức xác thực linh hoạt**:
+   - **Google OAuth 2.0 trực tiếp**: Sử dụng `GOOGLE_CLIENT_ID` và `GOOGLE_CLIENT_SECRET` trong file `.env`.
+   - **Supabase Auth OAuth**: Sử dụng `supabase.auth.signInWithOAuth({ provider: 'google' })` khi dự án đã cấu hình Google Provider trên Supabase Dashboard.
 
 ### 18.2 Chi Tiết Luồng Tương Tác Google OAuth
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Teacher as Teacher Part-time (email: null)
+    actor Teacher as Giảng Viên (email: null)
     participant LoginUI as /login
     participant MW as Middleware
     participant ConnectUI as /connect-google-drive
-    participant GoogleAuth as Google OAuth 2.0
+    participant GoogleAuth as Google OAuth 2.0 / Supabase Auth
     participant Callback as /api/auth/google/callback
     participant DB as Supabase users
     participant JSON as data/google_drive_tokens.json
 
-    Teacher->>LoginUI: Đăng nhập bằng huynhnhatanh / password
-    LoginUI->>ConnectUI: Điều hướng sang /connect-google-drive (do email = null)
-    Teacher->>ConnectUI: Xem thông tin tài khoản & nhấn "Liên kết với Google Drive"
-    ConnectUI->>GoogleAuth: Chuyển hướng tới màn hình cấp quyền Google
-    Teacher->>GoogleAuth: Cấp quyền truy cập Google Drive & Email
+    Teacher->>LoginUI: Đăng nhập tài khoản giảng viên (email = null)
+    LoginUI->>ConnectUI: Điều hướng sang /connect-google-drive
+    Teacher->>ConnectUI: Nhấn "Liên kết với Google Drive" (trực tiếp hoặc qua Supabase)
+    ConnectUI->>GoogleAuth: Cấp quyền truy cập Google Drive & Email
     GoogleAuth->>Callback: Redirect về /api/auth/google/callback?code=...
-    Callback->>GoogleAuth: Gửi POST đổi code lấy tokens
-    Callback->>GoogleAuth: Gọi /oauth2/v2/userinfo lấy googleEmail
+    Callback->>GoogleAuth: Đổi code lấy tokens & email người dùng
     Callback->>DB: UPDATE users SET email = googleEmail, updated_at = NOW()
     Callback->>JSON: Lưu access_token & refresh_token theo userId
     Callback->>Callback: Ký lại SMH JWT Token mới có chứa email
-    Callback-->>Teacher: Điều hướng về /teacher-parttime/dashboard?connected=drive_success
-    Teacher->>MW: Truy cập Dashboard
+    Callback-->>Teacher: Điều hướng động về /${roleSlug}/dashboard?connected=drive_success
+    Teacher->>MW: Truy cập Dashboard tương ứng vai trò
     MW-->>Teacher: Cho phép truy cập bình thường (email đã tồn tại)
 ```
 
@@ -820,7 +821,52 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 ```
-- Khi quản trị viên chưa điền khóa vào `.env`, màn hình `/connect-google-drive` hiển thị thông báo hướng dẫn rõ ràng và vô hiệu hóa nút liên kết một cách an toàn.
+
+---
+
+## 19. Luồng Chế Độ Bảo Trì Đa Môi Trường & Bố Cục Thống Nhất (Production Persistent Maintenance Flow & Unified Layout)
+
+### 19.1 Lưu Trữ Bền Vững Đa Môi Trường
+1. **Lưu trữ trên Supabase Database**:
+   - Bảng `system_settings` (hoặc fallback bản ghi hệ thống `__system_maintenance__` trong bảng `users`) lưu trữ trường `key: "maintenance"`, `enabled: boolean`, `expected_end_time: string`.
+   - Giải quyết triệt để vấn đề vô trạng thái (stateless) của môi trường serverless (Vercel Production), nơi hệ thống tệp cục bộ (`fs`) không được lưu giữ giữa các instance lambda.
+2. **Bộ đệm thông minh (Smart Caching)**:
+   - Caching in-memory với TTL 3 giây tại cả tầng `maintenance-service.ts` và tầng `middleware.ts`.
+   - Giảm thiểu số lượng request tới database nhưng đảm bảo phản ứng gần như tức thì khi Admin kích hoạt hoặc tắt bảo trì.
+3. **Cơ chế tự động hết hạn (Auto-expiry)**:
+   - Khi thời gian hiện tại vượt quá `expectedEndTime`, hệ thống tự động xác định trạng thái bảo trì đã kết thúc mà không cần thao tác tắt thủ công từ Admin.
+
+### 19.2 Cơ Chế Chặn Toàn Diện Tại Middleware
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Người dùng (Non-Admin)
+    actor Admin as Quản trị viên (Admin)
+    participant MW as Middleware (Edge/Serverless)
+    participant DB as Supabase DB (REST API)
+    participant MPage as /maintenance
+    participant Login as /login?admin=1
+    participant Mgt as /admin/system-management/maintenance
+
+    Admin->>Mgt: Bật Chế độ Bảo trì (lưu vào Supabase DB)
+    User->>MW: Truy cập /, /login, hoặc bất kỳ route nghiệp vụ nào
+    MW->>DB: Kiểm tra trạng thái bảo trì (cache TTL 3s)
+    DB-->>MW: maintenance.enabled = true
+    MW-->>User: Chuyển hướng 307 về /maintenance
+    Admin->>MPage: Nhấn nút "Quản trị viên đăng nhập"
+    MPage->>Login: Chuyển sang /login?admin=1
+    MW-->>Admin: Cho phép truy cập /login khi có tham số ?admin=1
+    Admin->>Login: Đăng nhập tài khoản admin
+    MW-->>Admin: Cho phép Admin vào Dashboard và màn hình quản lý bảo trì
+```
+
+### 19.3 Quy Chuẩn Thống Nhất Giao Diện & Loại Bỏ Văn Bản Giải Thích
+1. **Thẻ Tiêu Đề Đồng Nhất (Unified Page Header Card)**:
+   - Áp dụng trên 100% màn hình chức năng: Quản lý người dùng, Phân quyền màn hình, Cơ sở trực thuộc, Lịch trải nghiệm, Bảo trì hệ thống, Hồ sơ cá nhân.
+   - Bố cục: Thẻ viền tinh tế bo góc lớn `rounded-3xl`, icon đại diện `w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 border border-rose-500/20`, tiêu đề in hoa đậm `font-black tracking-wide`, phụ đề súc tích 1 dòng, và các nút tác vụ (Làm mới, Thêm mới) ở góc phải.
+2. **Triệt tiêu văn bản giải thích hướng dẫn (Zero Explanatory Text)**:
+   - Loại bỏ toàn bộ các khối chú thích dài dòng ("Tại sao cần...", "Lưu ý...", "👉 Vuốt ngang...") để giữ giao diện tối giản, tập trung vào thao tác nghiệp vụ.
+
 
 
 

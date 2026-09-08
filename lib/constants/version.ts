@@ -20,35 +20,30 @@ export interface ReleaseVersion {
 
 // Phiên bản hiện tại mới nhất của hệ thống
 export const CURRENT_VERSION: ReleaseVersion = {
-  version: "v1.6",
-  releaseDate: "07/09/2026",
-  title: "Bắt Buộc OAuth Google Drive Cho Teacher Part-Time & Nâng Cấp Giao Diện Sidebar Thống Nhất",
+  version: "v1.7",
+  releaseDate: "08/09/2026",
+  title:
+    "Bảo Trì Bền Vững Đa Môi Trường, Đồng Bộ Bố Cục Thống Nhất & Hoàn Thiện OAuth Cho Giảng Viên",
   summary:
-    "Tích hợp luồng xác thực bắt buộc Google Drive cho Giảng viên Part-time, tái cấu trúc nút điều hướng chân Sidebar, đồng bộ hoàn hảo căn chỉnh giao diện và bổ sung bộ tài nguyên ảnh logo SMH chất lượng cao.",
+    "Lưu trữ trạng thái bảo trì trên Supabase Database ngăn chặn triệt để truy cập trên môi trường Production, thống nhất thiết kế thẻ tiêu đề tinh gọn loại bỏ mọi văn bản giải thích thừa, và hoàn thiện luồng Google OAuth cho Giảng viên Full-time.",
   features: [
     {
-      title: "Bắt Buộc Liên Kết Google Drive (Teacher Part-time)",
+      title: "Chế Độ Bảo Trì Bền Vững Đa Môi Trường (Production Persistence)",
       description:
-        "Tự động phát hiện tài khoản Giảng viên Part-time chưa có email và bắt buộc liên kết Google Drive qua OAuth để kích hoạt email hồ sơ và đồng bộ tài liệu trước khi truy cập hệ thống.",
+        "Lưu trữ trạng thái bảo trì trực tiếp trên Supabase Database với bộ đệm in-memory 3s, đảm bảo Middleware chặn 100% tài khoản non-admin trên serverless Production và tự động hết hạn khi đến hạn kết thúc.",
+      category: "Bảo Mật & Ổn Định",
+    },
+    {
+      title: "Bố Cục Giao Diện Thống Nhất & Tinh Gọn (Zero Explanatory Text)",
+      description:
+        "Đồng bộ thẻ tiêu đề chuẩn (Unified Page Header Card) trên toàn bộ các màn hình, loại bỏ toàn bộ ghi chú và hướng dẫn rườm rà, giữ giao diện sạch sẽ và tập trung vào dữ liệu nghiệp vụ.",
+      category: "Cải Tiến",
+    },
+    {
+      title: "Hoàn Thiện OAuth Google Drive Cho Giảng Viên Full-Time & Supabase Auth",
+      description:
+        "Khắc phục sự cố phân quyền và điều hướng cho Teacher Full-time, hỗ trợ linh hoạt cả Google OAuth trực tiếp và Supabase Auth OAuth kèm cơ chế điều hướng động về đúng Dashboard theo vai trò.",
       category: "Tính Năng Mới",
-    },
-    {
-      title: "Tái Cấu Trúc Nút Chuyển Trang Chủ / Dashboard Tại Chân Sidebar",
-      description:
-        "Chuyển nút điều hướng xuống đáy Sidebar với kiểu dáng Action Button nổi bật riêng biệt, đồng thời tự động ẩn các menu quản trị phức tạp khi người dùng đang ở Trang chủ.",
-      category: "Cải Tiến",
-    },
-    {
-      title: "Đồng Bộ Căn Chỉnh Khung Lề Header & Footer",
-      description:
-        "Chuẩn hóa khung lề đồng nhất trên toàn bộ các giao diện, loại bỏ hoàn toàn hiện tượng lệch lề trái phải trên màn hình rộng, tối ưu hiển thị responsive trên thiết bị di động.",
-      category: "Cải Tiến",
-    },
-    {
-      title: "Bộ Tài Nguyên Ảnh Logo SMH & Thanh Cuộn Hiện Đại",
-      description:
-        "Lưu trữ sẵn các định dạng ảnh PNG độ phân giải cao và Vector SVG của logo SMH trong dự án, tích hợp favicon tab trình duyệt và áp dụng thanh cuộn mỏng nhẹ (7px) sang trọng.",
-      category: "Cải Tiến",
     },
   ],
 };
