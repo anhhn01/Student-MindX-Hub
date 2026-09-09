@@ -46,22 +46,89 @@ function ConnectGoogleDriveContent() {
       .then((data) => {
         if (data.authenticated && data.user) {
           const roleName = data.user.role || "Teacher Part-time";
+          const isPartTime =
+            roleName.toLowerCase().includes("part-time") ||
+            roleName.toLowerCase().includes("parttime");
+
           setUserData({
             name: data.user.name || "Giáo viên",
             role: roleName,
             lms_code: data.user.lms_code || "",
           });
 
-          // Nếu tài khoản này đã có email (đã liên kết xong), tự động chuyển về đúng dashboard của vai trò
-          if (data.user.email && !data.user.requires_google_drive) {
+          // Bắt buộc OAuth CHỈ áp dụng riêng cho Teacher Part-time
+          // Nếu không phải Teacher Part-time, hoặc tài khoản đã có email, tự động chuyển về đúng dashboard
+          if (!isPartTime || (data.user.email && !data.user.requires_google_drive)) {
             const roleSlug = getRoleSlug(roleName);
             router.replace(`/${roleSlug}/dashboard`);
+            return;
           }
         }
       })
       .catch(() => {});
 
-    // 2. Lấy URL OAuth
+    // 2. Lắng nghe phiên đăng nhập OAuth từ Supabase Provider (Google)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user?.email) {
+        setLoading(true);
+        try {
+          const res = await fetch("/api/auth/google/callback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: session.user.email,
+              provider_token: session.provider_token,
+              provider_refresh_token: session.provider_refresh_token,
+            }),
+          });
+          const resData = await res.json();
+          if (resData.success && resData.redirect_url) {
+            window.location.href = resData.redirect_url;
+            return;
+          }
+        } catch (err) {
+          console.error("Lỗi đồng bộ email Supabase Google:", err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+
+    // 3. Nếu URL có chứa code từ Supabase redirect (PKCE flow)
+    const codeParam = searchParams.get("code");
+    if (codeParam) {
+      setLoading(true);
+      supabase.auth
+        .exchangeCodeForSession(codeParam)
+        .then(async ({ data: exchangeData, error: exchangeError }) => {
+          if (!exchangeError && exchangeData?.user?.email) {
+            const res = await fetch("/api/auth/google/callback", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: exchangeData.user.email,
+                provider_token: exchangeData.session?.provider_token,
+                provider_refresh_token: exchangeData.session?.provider_refresh_token,
+              }),
+            });
+            const resData = await res.json();
+            if (resData.success && resData.redirect_url) {
+              window.location.href = resData.redirect_url;
+              return;
+            }
+          }
+        })
+        .catch((e) => {
+          console.error("Lỗi exchange code Supabase:", e);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+
+    // 4. Lấy URL OAuth trực tiếp (fallback)
     fetch("/api/auth/google/url", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
@@ -76,19 +143,27 @@ function ConnectGoogleDriveContent() {
       .finally(() => {
         setCheckingConfig(false);
       });
-  }, [router]);
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router, searchParams]);
 
   const handleConnectClick = async () => {
     setLoading(true);
 
-    // 1. Thử ưu tiên đăng nhập OAuth qua Supabase Auth nếu được kích hoạt
+    // 1. Ưu tiên đăng nhập OAuth qua Supabase Auth (Google Provider)
     try {
       const redirectOrigin = typeof window !== "undefined" ? window.location.origin : "";
       const { data: sbData, error: sbError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${redirectOrigin}/api/auth/google/callback`,
+          redirectTo: `${redirectOrigin}/connect-google-drive`,
           scopes: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
         },
       });
 
@@ -98,7 +173,7 @@ function ConnectGoogleDriveContent() {
       }
     } catch (_) {}
 
-    // 2. Sử dụng Google OAuth URL trực tiếp từ hệ thống
+    // 2. Sử dụng Google OAuth URL trực tiếp từ hệ thống (fallback)
     if (authUrl) {
       window.location.href = authUrl;
     } else {

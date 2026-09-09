@@ -126,6 +126,18 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
       - Khối Tiêu đề: Khung icon đại diện kích thước chuẩn `w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20`, tiêu đề in hoa đậm (`font-black tracking-wide text-xl sm:text-2xl`), và phụ đề ngắn gọn 1 dòng súc tích (`text-xs sm:text-sm text-slate-500 dark:text-slate-400`).
       - Khối Hành động: Đặt toàn bộ các nút thao tác nghiệp vụ, nút làm mới, nút thêm mới gọn gàng ở phía bên phải.
     - **Tuyệt Đối Không Thêm Văn Bản / Ghi Chú Giải Thích Hướng Dẫn**: Không được phép tự ý thêm các khối ghi chú, hộp cảnh báo, banner hướng dẫn dài dòng ("Tại sao cần làm...", "Lưu ý khi sử dụng...", "👉 Vuốt ngang để xem...") vào bất kỳ màn hình nào trừ khi có yêu cầu cụ thể từ người dùng. Giao diện phải sạch sẽ, tinh gọn, tập trung hoàn toàn vào dữ liệu và tác vụ.
+32. **Quy Chuẩn Bắt Buộc OAuth Riêng Cho Teacher Part-Time & Tính Năng Hủy Liên Kết (Google Drive OAuth Scope & Unlink Standard)**:
+    - Cơ chế bắt buộc OAuth Google Drive chỉ áp dụng DUY NHẤT cho vai trò `Teacher Part-time` khi email trong Supabase còn trống. Tài khoản `Teacher Full-time` và `Admin` không bị ép buộc liên kết.
+    - **Hủy liên kết Google Drive**:
+      - Người dùng có thể tự hủy liên kết tài khoản Google Drive của mình tại trang Hồ sơ cá nhân (`/profile`).
+      - Trong màn hình Quản lý tài khoản (`/[role]/system-management/users`), người dùng có vai trò cấp bậc cao hơn (`callerPoints < targetPoints`) có quyền hủy liên kết Google Drive cho các tài khoản cấp dưới (tuyệt đối không được hủy liên kết của chính mình tại đây hoặc của người có cấp bậc bằng/cao hơn).
+33. **Quy Chuẩn Quản Lý Lớp Học & Chi Tiết Mốc Đánh Giá Checkpoint (Class Management & Checkpoint Standard)**:
+    - Màn hình Quản lý lớp học đặt tại **QUẢN LÝ HỆ THỐNG** với đường dẫn chuẩn: `/[role]/system-management/classes`.
+    - Tự động lọc lớp học theo danh sách cơ sở trực thuộc của tài khoản đang đăng nhập (`user_centres`) và các trạng thái: `OPEN`, `RUNNING`, `FINISHED`.
+    - Bảng hiển thị gồm các cột: STT, Mã lớp, Cơ sở, Ngày bắt đầu, Ngày kết thúc, Tiến độ buổi học (thanh tiến trình % và số buổi đã hoàn thành / tổng số buổi), Trạng thái, Thao tác (icon `Eye`).
+    - Modal xem chi tiết lớp học: Khi bấm nút Xem chi tiết, modal hiển thị thông tin lớp, 3 thẻ mốc nổi bật: **Checkpoint 1** (buổi + ngày), **Checkpoint 2** (buổi + ngày), **Sản phẩm cuối khóa** (buổi + ngày), cùng bảng danh sách lịch trình toàn bộ các buổi học và tóm tắt nội dung.
+34. **Quy Chuẩn Lọc 71 Cơ Sở LMS Đang Hoạt Động (Active LMS Centres Standard)**:
+    - Hệ thống tự động kiểm tra trường `isActive` từ GraphQL LMS MindX và chỉ lưu trữ / hiển thị đúng **71 cơ sở đang hoạt động (`isActive === true`)**, loại bỏ hoàn toàn 32 cơ sở đã đóng cửa hoặc hủy.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

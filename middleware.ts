@@ -120,7 +120,8 @@ export async function middleware(request: NextRequest) {
 
   const isTeacherPartTime = userRole.includes("part-time") || userRole.includes("parttime");
   const isTeacherFullTime = userRole.includes("full-time") || userRole.includes("fulltime");
-  const isTeacherMissingEmail = (isTeacherPartTime || isTeacherFullTime) && (!userEmail || userEmail === "");
+  // Bắt buộc liên kết Google Drive CHỈ áp dụng riêng cho Teacher Part-time khi email đang trống
+  const isTeacherMissingEmail = isTeacherPartTime && (!userEmail || userEmail === "");
 
   // Xác định dashboard chuẩn dựa theo vai trò của người dùng
   const getRoleDashboard = (role: string) => {
@@ -159,7 +160,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(getRoleDashboard(userRole), request.url));
   }
 
-  // 1.5 BẮT BUỘC OAUTH GOOGLE DRIVE: Teacher Full-time hoặc Part-time mà email đang trống bắt buộc phải liên kết trước khi truy cập bất kỳ route nào khác
+  // 1.5 BẮT BUỘC OAUTH GOOGLE DRIVE: Chỉ áp dụng cho Teacher Part-time mà email đang trống
   if (isAuthenticated && isTeacherMissingEmail) {
     const isAllowedOAuthPath =
       pathname.startsWith("/connect-google-drive") ||
@@ -273,6 +274,17 @@ export async function middleware(request: NextRequest) {
     if (pathname.includes("/data-inspection/trial_schedules")) {
       const canAccessTrial = isAdmin || userPerms["trial_schedules"] === true;
       if (!canAccessTrial) {
+        return NextResponse.rewrite(new URL("/not-found", request.url));
+      }
+    }
+
+    // 2.5 Màn hình Quản lý lớp học: /[role]/system-management/classes
+    if (pathname.includes("/system-management/classes")) {
+      const canAccessClasses =
+        isAdmin ||
+        userPerms["class_management"] === true ||
+        (userPerms["class_management"] === undefined && userPerms["system_management"] === true);
+      if (!canAccessClasses) {
         return NextResponse.rewrite(new URL("/not-found", request.url));
       }
     }

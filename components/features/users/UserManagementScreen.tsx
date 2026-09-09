@@ -22,6 +22,7 @@ import {
   EyeOff,
   KeyRound,
   Users,
+  Link2Off,
 } from "lucide-react";
 import { API_ROUTES, getRoleSlug } from "@/lib/constants/api-routes";
 import { getRolePoints } from "@/lib/constants/roles";
@@ -30,6 +31,7 @@ interface User {
   id: string;
   lms_code: string | null;
   full_name: string | null;
+  email?: string | null;
   created_at: string;
   is_firebase: boolean;
   status: string; // Joined text string ("approved", "pending", "rejected")
@@ -323,6 +325,43 @@ export default function UserManagementScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Không thể đổi vai trò");
       fetchUsers();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Hủy liên kết Google Drive cho tài khoản cấp dưới
+  const handleUnlinkGoogle = async (user: User) => {
+    const targetPoints = user.role_points || getRolePoints(user.role);
+    if (user.id === currentUserId) {
+      alert("Để hủy liên kết Google Drive của chính mình, vui lòng vào trang Hồ sơ cá nhân!");
+      return;
+    }
+    if (targetPoints <= currentUserRolePoints && currentUserRolePoints > 1) {
+      alert("Bạn không thể hủy liên kết của người có cấp bậc bằng hoặc cao hơn!");
+      return;
+    }
+    if (!confirm(`Bạn có chắc chắn muốn hủy liên kết Google Drive cho tài khoản "${user.full_name || user.lms_code}" không?`)) {
+      return;
+    }
+
+    setUpdatingId(user.id);
+    try {
+      const res = await fetch("/api/auth/google/unlink", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_user_id: user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không thể hủy liên kết Google Drive");
+
+      alert("Hủy liên kết Google Drive thành công!");
+      fetchUsers();
+      if (viewingUser?.id === user.id) {
+        setViewingUser((prev) => (prev ? { ...prev, email: null } : null));
+      }
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -641,6 +680,17 @@ export default function UserManagementScreen() {
                               <Eye className="w-4 h-4" />
                             </button>
 
+                            {user.email && (
+                              <button
+                                onClick={() => handleUnlinkGoogle(user)}
+                                disabled={cannotModify || updatingId === user.id}
+                                className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                title={cannotModify ? "Khóa quyền hủy liên kết" : "Hủy liên kết Google Drive"}
+                              >
+                                <Link2Off className="w-4 h-4" />
+                              </button>
+                            )}
+
                             <button
                               onClick={() => handleDeleteUser(user)}
                               disabled={cannotModify || updatingId === user.id}
@@ -841,6 +891,29 @@ export default function UserManagementScreen() {
                 <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                   <span className="text-slate-500 dark:text-slate-400">Trạng Thái:</span>
                   <span className="capitalize font-semibold text-slate-900 dark:text-white">{viewingUser.status}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 items-center">
+                  <span className="text-slate-500 dark:text-slate-400">Email Google Drive:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-slate-900 dark:text-white">
+                      {viewingUser.email || "Chưa liên kết"}
+                    </span>
+                    {viewingUser.email && (
+                      <button
+                        onClick={() => handleUnlinkGoogle(viewingUser)}
+                        disabled={
+                          viewingUser.id === currentUserId ||
+                          ((viewingUser.role_points || getRolePoints(viewingUser.role)) <= currentUserRolePoints && currentUserRolePoints > 1) ||
+                          updatingId === viewingUser.id
+                        }
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Hủy liên kết tài khoản Google Drive này"
+                      >
+                        <Link2Off className="w-3 h-3" />
+                        <span>Hủy liên kết</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span className="text-slate-500 dark:text-slate-400">Ngày Tạo:</span>

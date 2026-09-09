@@ -20,30 +20,30 @@ export interface ReleaseVersion {
 
 // Phiên bản hiện tại mới nhất của hệ thống
 export const CURRENT_VERSION: ReleaseVersion = {
-  version: "v1.7",
-  releaseDate: "08/09/2026",
+  version: "v1.8",
+  releaseDate: "09/09/2026",
   title:
-    "Bảo Trì Bền Vững Đa Môi Trường, Đồng Bộ Bố Cục Thống Nhất & Hoàn Thiện OAuth Cho Giảng Viên",
+    "Quản Lý Lớp Học & Mốc Đánh Giá Checkpoint, Hủy Liên Kết Google Drive & Lọc Cơ Sở Đang Hoạt Động",
   summary:
-    "Lưu trữ trạng thái bảo trì trên Supabase Database ngăn chặn triệt để truy cập trên môi trường Production, thống nhất thiết kế thẻ tiêu đề tinh gọn loại bỏ mọi văn bản giải thích thừa, và hoàn thiện luồng Google OAuth cho Giảng viên Full-time.",
+    "Bổ sung màn hình Quản lý lớp học theo cơ sở trực thuộc với modal xem chi tiết Checkpoint 1, Checkpoint 2 và Demo cuối khóa; bổ sung tính năng Hủy liên kết Google Drive theo phân cấp vai trò và tại Hồ sơ cá nhân; tinh lọc danh mục 71 cơ sở LMS đang hoạt động.",
   features: [
     {
-      title: "Chế Độ Bảo Trì Bền Vững Đa Môi Trường (Production Persistence)",
+      title: "Quản Lý Lớp Học & Mốc Đánh Giá Checkpoint",
       description:
-        "Lưu trữ trạng thái bảo trì trực tiếp trên Supabase Database với bộ đệm in-memory 3s, đảm bảo Middleware chặn 100% tài khoản non-admin trên serverless Production và tự động hết hạn khi đến hạn kết thúc.",
+        "Bổ sung màn hình Quản lý lớp học tại /[role]/system-management/classes, theo dõi tiến độ buổi học, trạng thái lớp (Open, Running, Finished) và modal xem chi tiết Checkpoint 1, Checkpoint 2, Sản phẩm cuối khóa cùng lịch trình buổi học.",
+      category: "Tính Năng Mới",
+    },
+    {
+      title: "Hủy Liên Kết Google Drive Theo Phân Cấp Quyền Hạn",
+      description:
+        "Hỗ trợ tính năng Hủy liên kết Google Drive cho chính mình tại trang Hồ sơ cá nhân, đồng thời cho phép tài khoản có vai trò cấp bậc cao hơn hủy liên kết cho tài khoản cấp dưới trong Quản lý tài khoản.",
       category: "Bảo Mật & Ổn Định",
     },
     {
-      title: "Bố Cục Giao Diện Thống Nhất & Tinh Gọn (Zero Explanatory Text)",
+      title: "Lọc Danh Mục 71 Cơ Sở LMS Đang Hoạt Động",
       description:
-        "Đồng bộ thẻ tiêu đề chuẩn (Unified Page Header Card) trên toàn bộ các màn hình, loại bỏ toàn bộ ghi chú và hướng dẫn rườm rà, giữ giao diện sạch sẽ và tập trung vào dữ liệu nghiệp vụ.",
+        "Tự động loại bỏ 32 cơ sở đã ngưng hoạt động trên hệ thống LMS MindX, đảm bảo toàn bộ bộ lọc và ma trận chỉ làm việc với 71 cơ sở thực tế đang vận hành.",
       category: "Cải Tiến",
-    },
-    {
-      title: "Hoàn Thiện OAuth Google Drive Cho Giảng Viên Full-Time & Supabase Auth",
-      description:
-        "Khắc phục sự cố phân quyền và điều hướng cho Teacher Full-time, hỗ trợ linh hoạt cả Google OAuth trực tiếp và Supabase Auth OAuth kèm cơ chế điều hướng động về đúng Dashboard theo vai trò.",
-      category: "Tính Năng Mới",
     },
   ],
 };

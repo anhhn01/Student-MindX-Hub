@@ -49,6 +49,14 @@ const DEFAULT_MENU_TREE = [
         is_parent: false,
         parent_code: "system_management",
       },
+      {
+        id: "menu_class_management",
+        code: "class_management",
+        name: "Quản lý lớp học",
+        path: "/[role]/system-management/classes",
+        is_parent: false,
+        parent_code: "system_management",
+      },
     ],
   },
   {

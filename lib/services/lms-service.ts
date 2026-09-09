@@ -221,6 +221,7 @@ export async function fetchOfficialCentresList(token?: string): Promise<Array<{ 
               name
               shortName
               code
+              isActive
             }
           }
         }
@@ -243,7 +244,8 @@ export async function fetchOfficialCentresList(token?: string): Promise<Array<{ 
       }
 
       for (const c of pageData) {
-        if (c && c.id && !map.has(c.id)) {
+        // Chỉ lấy các cơ sở đang hoạt động (isActive === true)
+        if (c && c.id && c.isActive === true && !map.has(c.id)) {
           map.set(c.id, {
             id: c.id,
             name: c.name,
@@ -564,3 +566,196 @@ export async function fetchOfficeHours({
     return [];
   }
 }
+
+export interface LmsClassSlot {
+  index: number;
+  date: string;
+  summary?: string | null;
+  homework?: string | null;
+}
+
+export interface LmsClassItem {
+  id: string;
+  name: string; // Mã lớp
+  status: "OPEN" | "RUNNING" | "FINISHED" | string;
+  startDate?: string | null;
+  endDate?: string | null;
+  numberOfSessions: number;
+  completedSessions: number;
+  progressPercent: number;
+  centre: {
+    id: string;
+    name: string;
+    shortName?: string;
+  } | null;
+  course?: {
+    id?: string;
+    name?: string;
+  } | null;
+  courseProcess?: {
+    name?: string;
+    checkpoint1Session?: number | null;
+    checkpoint1Date?: string | null;
+    checkpoint2Session?: number | null;
+    checkpoint2Date?: string | null;
+    finalProjectSession?: number | null;
+    finalProjectDate?: string | null;
+  } | null;
+  slots: LmsClassSlot[];
+}
+
+// Lấy danh sách lớp học theo cơ sở trực thuộc và trạng thái OPEN, RUNNING, FINISHED
+export async function fetchClassesFromLms({
+  centreIds,
+  statuses = ["OPEN", "RUNNING", "FINISHED"],
+  token,
+}: {
+  centreIds?: string[];
+  statuses?: string[];
+  token?: string;
+}): Promise<LmsClassItem[]> {
+  const authToken = token || (await getAdminFirebaseToken());
+  if (!authToken) return [];
+
+  try {
+    const payload: Record<string, any> = {
+      paginationType: "OFFSET",
+      pageIndex: 0,
+      itemsPerPage: 500,
+      status_in: statuses,
+    };
+
+    if (Array.isArray(centreIds) && centreIds.length > 0) {
+      payload.centre_in = centreIds;
+    }
+
+    const query = `
+      query GetClasses($payload: ClassQuery) {
+        classes(payload: $payload) {
+          data {
+            id
+            name
+            status
+            startDate
+            endDate
+            numberOfSessions
+            centre {
+              id
+              name
+              shortName
+            }
+            course {
+              id
+              name
+            }
+            courseProcess {
+              id
+              name
+              checkpointSessions {
+                session
+              }
+              finalSession {
+                id
+              }
+            }
+            slots {
+              index
+              date
+              summary
+              homework
+            }
+          }
+        }
+      }
+    `;
+
+    const res = await fetch(LMS_GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        operationName: "GetClasses",
+        query,
+        variables: { payload },
+      }),
+    });
+
+    const resData = await res.json();
+    const rawList = resData?.data?.classes?.data || [];
+    const now = new Date();
+
+    return rawList.map((c: any) => {
+      const slots: LmsClassSlot[] = (c.slots || [])
+        .map((s: any) => ({
+          index: s.index,
+          date: s.date,
+          summary: s.summary || null,
+          homework: s.homework || null,
+        }))
+        .sort((a: LmsClassSlot, b: LmsClassSlot) => a.index - b.index);
+
+      const totalSessions = c.numberOfSessions || slots.length || 0;
+
+      // Tính số buổi đã hoàn thành
+      let completed = typeof c.completedSessions === "number" ? c.completedSessions : 0;
+      if (completed === 0 && slots.length > 0) {
+        completed = slots.filter((s) => new Date(s.date) <= now).length;
+      }
+      if (c.status === "FINISHED") {
+        completed = totalSessions;
+      }
+      const progressPercent = totalSessions > 0 ? Math.min(100, Math.round((completed / totalSessions) * 100)) : 0;
+
+      // Checkpoint 1 & 2
+      const cpSessions = c.courseProcess?.checkpointSessions || [];
+      const cp1Num = cpSessions[0]?.session || null;
+      const cp2Num = cpSessions[1]?.session || null;
+      const cp1Slot = cp1Num && slots[cp1Num - 1] ? slots[cp1Num - 1].date : null;
+      const cp2Slot = cp2Num && slots[cp2Num - 1] ? slots[cp2Num - 1].date : null;
+
+      // Buổi cuối khóa / Demo Day
+      const finalSessionNum = totalSessions || (slots.length > 0 ? slots.length : null);
+      const finalSlot = slots.length > 0 ? slots[slots.length - 1].date : null;
+
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        startDate: c.startDate || (slots.length > 0 ? slots[0].date : null),
+        endDate: c.endDate || (slots.length > 0 ? slots[slots.length - 1].date : null),
+        numberOfSessions: totalSessions,
+        completedSessions: completed,
+        progressPercent,
+        centre: c.centre
+          ? {
+              id: c.centre.id,
+              name: c.centre.name,
+              shortName: c.centre.shortName || undefined,
+            }
+          : null,
+        course: c.course
+          ? {
+              id: c.course.id,
+              name: c.course.name,
+            }
+          : null,
+        courseProcess: {
+          name: c.courseProcess?.name || "Tiến trình chuẩn",
+          checkpoint1Session: cp1Num,
+          checkpoint1Date: cp1Slot,
+          checkpoint2Session: cp2Num,
+          checkpoint2Date: cp2Slot,
+          finalProjectSession: finalSessionNum,
+          finalProjectDate: finalSlot,
+        },
+        slots,
+      };
+    });
+  } catch (err) {
+    console.error("Lỗi khi fetchClassesFromLms:", err);
+    return [];
+  }
+}
+

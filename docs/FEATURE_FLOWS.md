@@ -822,6 +822,16 @@ GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 ```
 
+### 18.4 Tính Năng Hủy Liên Kết Google Drive (Unlink Google Account)
+1. **Tự Hủy Liên Kết Tại Hồ Sơ Cá Nhân (`/profile`)**:
+   - Người dùng nhấp nút **"Hủy liên kết"** cạnh ô Email.
+   - Gửi yêu cầu `POST /api/auth/google/unlink` (lấy user ID từ token của người gọi).
+   - Hệ thống xóa trường `email` về `NULL` trong bảng `users` và xóa token Google Drive trong `data/google_drive_tokens.json`.
+2. **Hủy Liên Kết Cho Tài Khoản Cấp Dưới Trong Quản Lý Tài Khoản (`/[role]/system-management/users`)**:
+   - Người dùng có vai trò cao hơn (`callerPoints < targetPoints`) có nút **Link2Off (Hủy liên kết)** trên từng dòng và trong modal chi tiết tài khoản cấp dưới.
+   - Gửi yêu cầu `POST /api/auth/google/unlink` với `{ target_user_id: user.id }`.
+   - Backend kiểm tra phân cấp cấp bậc nghiêm ngặt (`targetPoints > callerPoints`), từ chối nếu cố hủy của người bằng hoặc cao hơn mình.
+
 ---
 
 ## 19. Luồng Chế Độ Bảo Trì Đa Môi Trường & Bố Cục Thống Nhất (Production Persistent Maintenance Flow & Unified Layout)
@@ -862,10 +872,47 @@ sequenceDiagram
 
 ### 19.3 Quy Chuẩn Thống Nhất Giao Diện & Loại Bỏ Văn Bản Giải Thích
 1. **Thẻ Tiêu Đề Đồng Nhất (Unified Page Header Card)**:
-   - Áp dụng trên 100% màn hình chức năng: Quản lý người dùng, Phân quyền màn hình, Cơ sở trực thuộc, Lịch trải nghiệm, Bảo trì hệ thống, Hồ sơ cá nhân.
+   - Áp dụng trên 100% màn hình chức năng: Quản lý người dùng, Phân quyền màn hình, Cơ sở trực thuộc, Quản lý lớp học, Lịch trải nghiệm, Bảo trì hệ thống, Hồ sơ cá nhân.
    - Bố cục: Thẻ viền tinh tế bo góc lớn `rounded-3xl`, icon đại diện `w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 border border-rose-500/20`, tiêu đề in hoa đậm `font-black tracking-wide`, phụ đề súc tích 1 dòng, và các nút tác vụ (Làm mới, Thêm mới) ở góc phải.
 2. **Triệt tiêu văn bản giải thích hướng dẫn (Zero Explanatory Text)**:
    - Loại bỏ toàn bộ các khối chú thích dài dòng ("Tại sao cần...", "Lưu ý...", "👉 Vuốt ngang...") để giữ giao diện tối giản, tập trung vào thao tác nghiệp vụ.
+
+---
+
+## 20. Quản Lý Lớp Học & Mốc Đánh Giá Checkpoint (Class Management & Checkpoints Flow)
+
+### 20.1 Định Tuyến & Ràng Buộc Cơ Sở Trực Thuộc
+- **Định tuyến chuẩn theo vai trò**: `/[role]/system-management/classes` (thuộc nhóm menu **QUẢN LÝ HỆ THỐNG**).
+- **Phân quyền truy cập**: Cho phép Admin và các vai trò có quyền `class_management: true` truy cập.
+- **Ràng buộc cơ sở trực thuộc (`user_centres`)**:
+  - Hệ thống chỉ truy vấn các lớp học thuộc các cơ sở mà tài khoản đang đăng nhập được phân quyền quản lý trong Supabase (`user_centres`).
+  - Hỗ trợ bộ lọc theo từng cơ sở cụ thể hoặc xem tất cả cơ sở trực thuộc.
+  - Hỗ trợ lọc theo trạng thái: `Tất cả`, `Đang học (RUNNING)`, `Sắp mở (OPEN)`, `Đã kết thúc (FINISHED)`.
+
+### 20.2 Dữ Liệu Lớp Học & Tính Toán Tiến Độ
+- **Nguồn dữ liệu**: GraphQL LMS MindX qua query `classes(payload: { itemsPerPage: 500, centre_in: targetCentres, status_in: ["OPEN", "RUNNING", "FINISHED"] })`.
+- **Bảng dữ liệu 8 cột chuẩn**:
+  | STT | Mã Lớp | Cơ Sở | Ngày Bắt Đầu | Ngày Kết Thúc | Tiến Độ Buổi Học | Trạng Thái | Thao Tác |
+  | :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+  | 1 | `LBB-ROB-ARMA12` | HCM - 414 Lũy Bán Bích | 08/09/2026 | 08/12/2026 | 1/14 buổi (7%) | Đang học | Icon Xem chi tiết |
+- **Tiến độ buổi học**:
+  - Tính dựa trên số slot có ngày học $\le$ thời điểm hiện tại: `completedSessions / numberOfSessions`.
+  - Hiển thị trực quan qua thanh phần trăm màu gradient Ruby Red (`from-rose-500 to-red-500`).
+
+### 20.3 Modal Chi Tiết Lớp Học & 3 Mốc Đánh Giá Quan Trọng
+Khi người dùng nhấp vào biểu tượng **Mắt (Xem chi tiết)** trên từng hàng lớp học, modal bung ra hiển thị:
+1. **Thông tin chung**: Mã lớp, tên khóa học, cơ sở, trạng thái, tổng số buổi học, ngày bắt đầu và kết thúc.
+2. **3 Thẻ Mốc Nổi Bật**:
+   - 🚩 **Checkpoint 1**: Buổi số + Ngày diễn ra (lấy từ `courseProcess.checkpointSessions[0]` và tra cứu ngày tại `slots`).
+   - 🚩 **Checkpoint 2**: Buổi số + Ngày diễn ra (lấy từ `courseProcess.checkpointSessions[1]` và tra cứu ngày tại `slots`).
+   - 🏆 **Sản Phẩm Cuối Khóa (Final Demo Day)**: Buổi số + Ngày diễn ra (buổi kết thúc khóa học).
+3. **Bảng Lịch Trình Chi Tiết Các Buổi Học**:
+   - Liệt kê toàn bộ danh sách buổi học (Buổi 1 đến N).
+   - Hiển thị ngày học, tóm tắt nội dung bài học (`summary`), và huy hiệu nổi bật (Badge) tương ứng cho các buổi là Checkpoint 1, Checkpoint 2, hoặc Demo cuối khóa.
+
+### 20.4 Danh Mục 71 Cơ Sở LMS Đang Hoạt Động (Active Centres Only)
+- Rà soát toàn bộ danh mục cơ sở MindX LMS qua GraphQL query `centres { id name shortName isActive }`.
+- Tự động loại bỏ 32 cơ sở không còn vận hành (`isActive === false`), lưu trữ và sử dụng độc quyền **71 cơ sở active** (`isActive === true`) trong hằng số `OFFICIAL_LMS_CENTRES` và các bộ lọc toàn hệ thống.
 
 
 

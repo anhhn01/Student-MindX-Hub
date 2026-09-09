@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   UserCheck,
   RefreshCw,
+  Link2Off,
 } from "lucide-react";
 import { API_ROUTES } from "@/lib/constants/api-routes";
 
@@ -142,6 +143,28 @@ export default function ProfilePage() {
       }
     } catch (_) {
       setFeedback({ type: "error", message: "Lỗi kết nối máy chủ khi lưu hồ sơ" });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    if (!confirm("Bạn có chắc chắn muốn hủy liên kết tài khoản Google không?")) {
+      return;
+    }
+    setSaveLoading(true);
+    try {
+      const res = await fetch("/api/auth/google/unlink", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không thể hủy liên kết Google");
+      setFeedback({ type: "success", message: data.message || "Đã hủy liên kết Google Drive thành công." });
+      await fetchProfile();
+    } catch (err: any) {
+      setFeedback({ type: "error", message: err.message });
     } finally {
       setSaveLoading(false);
     }
@@ -383,12 +406,28 @@ export default function ProfilePage() {
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
                         <span>Email</span>
-                        <span className="text-[10px] text-slate-400 font-normal">(Cố định)</span>
+                        <div className="flex items-center gap-2">
+                          {profile.email ? (
+                            <button
+                              type="button"
+                              onClick={handleUnlinkGoogle}
+                              disabled={saveLoading}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:underline cursor-pointer disabled:opacity-50"
+                              title="Hủy liên kết tài khoản Google Drive"
+                            >
+                              <Link2Off className="w-3 h-3" />
+                              <span>Hủy liên kết</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-normal">(Chưa liên kết)</span>
+                          )}
+                        </div>
                       </label>
                       <input
                         type="email"
                         disabled
                         value={profile.email || ""}
+                        placeholder="Chưa có email liên kết"
                         className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/30 text-slate-500 text-sm cursor-not-allowed"
                       />
                     </div>

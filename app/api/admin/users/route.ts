@@ -22,7 +22,7 @@ export async function GET() {
 
     const mainQuery = await supabase
       .from("users")
-      .select("id, lms_code, full_name, created_at, password_hash, is_firebase, user_statuses(name), roles(name)")
+      .select("id, lms_code, full_name, email, created_at, password_hash, is_firebase, user_statuses(name), roles(name)")
       .order("created_at", { ascending: false });
 
     users = mainQuery.data;
@@ -32,7 +32,7 @@ export async function GET() {
     if (error && error.message?.includes("is_firebase")) {
       const fallbackQuery = await supabase
         .from("users")
-        .select("id, lms_code, full_name, created_at, password_hash, user_statuses(name), roles(name)")
+        .select("id, lms_code, full_name, email, created_at, password_hash, user_statuses(name), roles(name)")
         .order("created_at", { ascending: false });
       users = fallbackQuery.data;
       error = fallbackQuery.error;
@@ -63,6 +63,7 @@ export async function GET() {
         id: u.id,
         lms_code: u.lms_code,
         full_name: u.full_name,
+        email: u.email || null,
         created_at: u.created_at,
         is_firebase: isLmsAccount,
         status: statusCode, // Text representation instead of status_id
