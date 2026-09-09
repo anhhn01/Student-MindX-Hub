@@ -130,6 +130,9 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       userId = request.cookies.get("user_id")?.value || "";
     }
+    if (!userId && body.user_id) {
+      userId = body.user_id;
+    }
 
     if (!userId) {
       return NextResponse.json(

@@ -879,7 +879,7 @@ sequenceDiagram
 
 ---
 
-## 20. Quản Lý Lớp Học & Mốc Đánh Giá Checkpoint (Class Management & Checkpoints Flow)
+## 20. Quản Lý Lớp Học, Lịch Trình & Hạn Nộp Bài (Class Management, Schedule & Deadlines Flow)
 
 ### 20.1 Định Tuyến & Ràng Buộc Cơ Sở Trực Thuộc
 - **Định tuyến chuẩn theo vai trò**: `/[role]/system-management/classes` (thuộc nhóm menu **QUẢN LÝ HỆ THỐNG**).
@@ -889,30 +889,80 @@ sequenceDiagram
   - Hỗ trợ bộ lọc theo từng cơ sở cụ thể hoặc xem tất cả cơ sở trực thuộc.
   - Hỗ trợ lọc theo trạng thái: `Tất cả`, `Đang học (RUNNING)`, `Sắp mở (OPEN)`, `Đã kết thúc (FINISHED)`.
 
-### 20.2 Dữ Liệu Lớp Học & Tính Toán Tiến Độ
-- **Nguồn dữ liệu**: GraphQL LMS MindX qua query `classes(payload: { itemsPerPage: 500, centre_in: targetCentres, status_in: ["OPEN", "RUNNING", "FINISHED"] })`.
-- **Bảng dữ liệu 8 cột chuẩn**:
-  | STT | Mã Lớp | Cơ Sở | Ngày Bắt Đầu | Ngày Kết Thúc | Tiến Độ Buổi Học | Trạng Thái | Thao Tác |
-  | :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-  | 1 | `LBB-ROB-ARMA12` | HCM - 414 Lũy Bán Bích | 08/09/2026 | 08/12/2026 | 1/14 buổi (7%) | Đang học | Icon Xem chi tiết |
-- **Tiến độ buổi học**:
-  - Tính dựa trên số slot có ngày học $\le$ thời điểm hiện tại: `completedSessions / numberOfSessions`.
-  - Hiển thị trực quan qua thanh phần trăm màu gradient Ruby Red (`from-rose-500 to-red-500`).
+### 20.2 Luồng Tìm Kiếm Real-time, Dropdown Gợi Ý & Quản Lý Lớp Bền Vững (Supabase Only)
+- **Cơ chế Tìm kiếm Real-time Dropdown theo tên/mã lớp (`type=search`)**:
+  - Khi người dùng nhập từ 2 ký tự trở lên vào ô tìm kiếm mã lớp, hệ thống tự động kích hoạt truy vấn real-time (debounce 300ms) qua API `/api/classes?type=search&q=...`.
+  - Hiển thị danh sách Dropdown ngay bên dưới ô nhập với đầy đủ: Mã lớp, Tên khóa học, Cơ sở, Khung giờ học, Giáo viên phụ trách (số buổi dạy nhiều nhất), Trạng thái lớp (`Đang học`, `Sắp mở`, `Đã kết thúc`), và huy hiệu `Đã trong quản lý` nếu lớp đã được lưu trên Supabase.
+  - Khi nhấp vào một lớp trong dropdown:
+    - Nếu lớp đã trong quản lý: Mở Modal ở chế độ Xem (`view mode`).
+    - Nếu lớp chưa có trong quản lý: Tự động tính toán hạn nộp bài mặc định và mở **Modal Chi Tiết Lớp Học** ở chế độ Thêm mới (`add mode`).
+- **Phân quyền dữ liệu theo vai trò (Role-based Visibility Scope)**:
+  - **Admin**: Nhìn thấy và tìm kiếm được toàn bộ các lớp học thuộc danh sách cơ sở trực thuộc của Admin (`user_centres`).
+  - **Teacher Full-time**:
+    - Chỉ nhìn thấy các lớp thuộc cơ sở trực thuộc của tài khoản (`user_centres`).
+    - **Ràng buộc Giáo viên Part-time**: Chỉ hiển thị và cho phép thêm các lớp học có giáo viên chính phụ trách là các tài khoản `Teacher Part-time` hiện có trong hệ thống SMH (Supabase `users` table).
+- **Quy tắc xác định Giáo viên phụ trách (Giáo viên có số buổi dạy nhiều nhất)**:
+  - Thống kê số buổi dạy của từng giáo viên trong lớp (loại trừ trợ giảng/supporter). Chọn giáo viên có số buổi dạy nhiều nhất (nếu bằng nhau thì hiển thị tất cả, ngăn cách bởi dấu phẩy).
+- **Ràng buộc lưu trữ Supabase (Tuyệt đối không thay đổi LMS)**:
+  - Dữ liệu lớp học quản lý và các hạn nộp bài được lưu trữ độc quyền và bền vững trên Supabase (`system_settings` key `managed_classes` kèm fallback file local `data/managed_classes_store.json`).
+  - Hệ thống chỉ thực hiện các câu lệnh đọc dữ liệu từ LMS (Read-only GraphQL Queries), **tuyệt đối không thực hiện bất kỳ mutation hay thao tác ghi nào làm thay đổi dữ liệu trên LMS**.
 
-### 20.3 Modal Chi Tiết Lớp Học & 3 Mốc Đánh Giá Quan Trọng
-Khi người dùng nhấp vào biểu tượng **Mắt (Xem chi tiết)** trên từng hàng lớp học, modal bung ra hiển thị:
-1. **Thông tin chung**: Mã lớp, tên khóa học, cơ sở, trạng thái, tổng số buổi học, ngày bắt đầu và kết thúc.
-2. **3 Thẻ Mốc Nổi Bật**:
-   - 🚩 **Checkpoint 1**: Buổi số + Ngày diễn ra (lấy từ `courseProcess.checkpointSessions[0]` và tra cứu ngày tại `slots`).
-   - 🚩 **Checkpoint 2**: Buổi số + Ngày diễn ra (lấy từ `courseProcess.checkpointSessions[1]` và tra cứu ngày tại `slots`).
-   - 🏆 **Sản Phẩm Cuối Khóa (Final Demo Day)**: Buổi số + Ngày diễn ra (buổi kết thúc khóa học).
+### 20.3 Bảng Danh Sách Lớp Đang Quản Lý (10 Cột Chuẩn)
+| STT | Mã Lớp & Khóa Học | Cơ Sở | Giáo Viên Phụ Trách | Giờ Học | Ngày Bắt Đầu | Ngày Kết Thúc | Tiến Độ | Trạng Thái | Thao Tác |
+| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | `LBB-ROB-ARMA12` | HCM - 414 Lũy Bán Bích | Nguyễn Huỳnh Nhật Ánh | `18:00 - 20:00` | 08/09/2026 | 08/12/2026 | 1/14 buổi (7%) | Đang học | Xem chi tiết, Tải LMS, Xóa |
+
+- **Giờ học (`classTime`)**: Trích xuất từ `scheduleSettings` hoặc slot đầu tiên, định dạng chuẩn Việt Nam UTC+7 (ví dụ: `18:00 - 20:00`).
+- **Giáo viên phụ trách (`teacherName`)**: Lấy từ danh sách `teachers` (vai trò Lecturer/Teacher) hoặc `contactTeacher`.
+- **Căn giữa chuẩn**: STT, Giáo viên phụ trách, Giờ học, Ngày bắt đầu, Ngày kết thúc, Tiến độ, Trạng thái, Thao tác đều được căn giữa (`text-center`) và áp dụng `whitespace-nowrap`.
+
+### 20.4 Modal Chi Tiết Lớp Học & Cấu Hình Hạn Nộp Bài Tùy Chỉnh
+1. **Thông tin tổng quan**: Thẻ ngang tinh gọn gồm Trạng thái, Giáo viên phụ trách, Giờ học (`18:00 - 20:00`), Tổng số buổi, Thời gian học (Ngày bắt đầu - kết thúc).
+2. **Loại bỏ**: Bỏ hoàn toàn 3 khối card mốc đánh giá riêng biệt và **bỏ hoàn toàn cột "Tóm tắt nội dung"** trong bảng lịch trình để giao diện thoáng đãng, tập trung.
 3. **Bảng Lịch Trình Chi Tiết Các Buổi Học**:
-   - Liệt kê toàn bộ danh sách buổi học (Buổi 1 đến N).
-   - Hiển thị ngày học, tóm tắt nội dung bài học (`summary`), và huy hiệu nổi bật (Badge) tương ứng cho các buổi là Checkpoint 1, Checkpoint 2, hoặc Demo cuối khóa.
+   - `Buổi`: Số thứ tự buổi học (1 đến N).
+   - `Ngày học`: Ngày diễn ra buổi học.
+   - `Giờ học`: Khung giờ của buổi học đó (`18:00 - 20:00`).
+   - `Ghi chú mốc`: Huy hiệu Checkpoint 1, Checkpoint 2, SP Cuối Khóa.
+   - `Hạn nộp bài (Có thể chỉnh sửa)`: Ô nhập trực tiếp cho phép người dùng tùy chỉnh hạn nộp bài theo từng buổi.
+4. **Quy tắc hạn nộp bài mặc định tự động**:
+   - **Từ Buổi 1 đến Checkpoint 2 (buổi 1 -> cp2)**: Mặc định là `[Bắt đầu buổi học] - [Kết thúc buổi học, Ngày học]` (ví dụ: `18:00 - 20:00, 08/09/2026`).
+   - **Sản phẩm cuối khóa (buổi cuối)**: Mặc định là `[Sau thời điểm kết thúc buổi Checkpoint 2] - [Thời điểm kết thúc buổi cuối cùng]` (ví dụ: `20:00, 27/10/2026 - 20:00, 08/12/2026`).
 
-### 20.4 Danh Mục 71 Cơ Sở LMS Đang Hoạt Động (Active Centres Only)
+### 20.5 Đồng Bộ Dữ Liệu Từ LMS & Modal So Sánh Thay Đổi Side-by-Side
+- Trên từng hàng lớp quản lý và trong Modal xem chi tiết có nút **"Tải dữ liệu từ LMS"** (icon `RefreshCw`).
+- Khi nhấn, hệ thống truy vấn dữ liệu lớp học mới nhất từ LMS GraphQL và so sánh đối chiếu: Khung giờ học, Giáo viên phụ trách, Trạng thái, Số buổi học, Ngày bắt đầu/kết thúc.
+- **Nếu có thay đổi**: Hệ thống mở **Modal So Sánh Thay Đổi (Side-by-Side Diff Modal)** hiển thị bảng 3 cột: `Thuộc tính` | `Dữ liệu hiện tại` (tô đỏ) | `Dữ liệu mới từ LMS` (tô xanh). Cần **xác nhận từ người dùng** (`Xác nhận cập nhật` / `Bỏ qua`).
+- Khi người dùng xác nhận cập nhật: hệ thống cập nhật dữ liệu mới nhất từ LMS vào Supabase nhưng **vẫn bảo lưu 100% các hạn nộp bài đã được người dùng tùy chỉnh trước đó**.
+- **Nếu không có thay đổi**: Hệ thống thông báo dữ liệu lớp học đã hoàn toàn đồng bộ với LMS.
+
+### 20.6 Danh Mục 71 Cơ Sở LMS Đang Hoạt Động (Active Centres Only)
 - Rà soát toàn bộ danh mục cơ sở MindX LMS qua GraphQL query `centres { id name shortName isActive }`.
 - Tự động loại bỏ 32 cơ sở không còn vận hành (`isActive === false`), lưu trữ và sử dụng độc quyền **71 cơ sở active** (`isActive === true`) trong hằng số `OFFICIAL_LMS_CENTRES` và các bộ lọc toàn hệ thống.
+
+---
+
+## 21. Quy Chuẩn Trang Chính Sách Quyền Riêng Tư (Privacy Policy & Google OAuth Compliance Standard)
+
+### 21.1 Mục Đích & Tiêu Chuẩn Xác Minh Google Cloud Console (GCP)
+- Trang chính sách quyền riêng tư đặt tại đường dẫn công khai: `/privacy`.
+- Phục vụ việc xác minh màn hình đồng ý OAuth (OAuth consent screen verification) trên Google Cloud Platform (GCP) và cung cấp minh bạch về cơ chế thu thập, sử dụng dữ liệu người dùng.
+- **Middleware Whitelist**: Tuyến `/privacy` được cấu hình mở công khai trong `middleware.ts`, cho phép tất cả người dùng (kể cả chưa đăng nhập hoặc tài khoản Teacher Part-time đang trong quá trình liên kết Google) đều có thể truy cập đọc chính sách.
+
+### 21.2 Nội Dung Chính Chuẩn Hóa
+1. **Thông tin định danh hệ thống**: Đơn vị chủ quản MindX Technology School, tác giả phát triển Huỳnh Nhật Anh (TF Coding HCM4).
+2. **Thông tin thu thập**: Email, Họ tên, Ảnh đại diện từ Google; mã LMS, cơ sở trực thuộc, phân quyền vai trò nội bộ; token xác thực OAuth.
+3. **Tuân thủ chính sách Google Limited Use**:
+   - Khai báo rõ ràng phạm vi sử dụng `https://www.googleapis.com/auth/drive.file`.
+   - Cam kết chỉ đọc và quản lý các tệp tin do chính hệ thống tạo ra hoặc người dùng chỉ định chia sẻ, tuyệt đối không truy cập các tệp tin cá nhân khác trong Google Drive.
+   - Tuân thủ chính sách dữ liệu dịch vụ Google API (Google API Services User Data Policy), bao gồm các yêu cầu về Limited Use.
+4. **Cam kết không thương mại hóa**: Tuyệt đối không bán, cho thuê, chia sẻ cho bên thứ ba hoặc dùng cho quảng cáo/huấn luyện AI.
+5. **Quyền của người dùng & Thu hồi liên kết (Unlink)**: Cho phép người dùng hủy liên kết Google Drive trực tiếp trên website hoặc từ trang quản lý tài khoản Google.
+
+### 21.3 Tích Hợp Liên Kết Trên Giao Diện
+- **Chân trang (SystemFooter)**: Bổ sung liên kết *"Chính sách quyền riêng tư"* ngay cạnh thông tin bản quyền và phiên bản hệ thống.
+- **Màn hình liên kết Google Drive (`/connect-google-drive`)**: Hiển thị liên kết dẫn trực tiếp tới `/privacy` phía dưới các nút thao tác để giảng viên xem xét trước khi cấp quyền.
+
 
 
 

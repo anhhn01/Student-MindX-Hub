@@ -570,8 +570,14 @@ export async function fetchOfficeHours({
 export interface LmsClassSlot {
   index: number;
   date: string;
+  startTime?: string | null;
+  endTime?: string | null;
   summary?: string | null;
   homework?: string | null;
+  teachers?: Array<{
+    role?: { name?: string } | null;
+    teacher?: { id?: string; fullName?: string; code?: string } | null;
+  }>;
 }
 
 export interface LmsClassItem {
@@ -580,6 +586,9 @@ export interface LmsClassItem {
   status: "OPEN" | "RUNNING" | "FINISHED" | string;
   startDate?: string | null;
   endDate?: string | null;
+  classTime?: string | null; // "19:00 - 21:00"
+  teacherName?: string | null; // "Bùi Trường Vũ"
+  teacherCodes?: string[];
   numberOfSessions: number;
   completedSessions: number;
   progressPercent: number;
@@ -604,13 +613,33 @@ export interface LmsClassItem {
   slots: LmsClassSlot[];
 }
 
+function formatVnTimeOnly(isoString?: string | null): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
+  } catch {
+    return "";
+  }
+}
+
 // Lấy danh sách lớp học theo cơ sở trực thuộc và trạng thái OPEN, RUNNING, FINISHED
 export async function fetchClassesFromLms({
   centreIds,
+  classIds,
+  searchQuery,
   statuses = ["OPEN", "RUNNING", "FINISHED"],
   token,
 }: {
   centreIds?: string[];
+  classIds?: string[];
+  searchQuery?: string;
   statuses?: string[];
   token?: string;
 }): Promise<LmsClassItem[]> {
@@ -624,6 +653,14 @@ export async function fetchClassesFromLms({
       itemsPerPage: 500,
       status_in: statuses,
     };
+
+    if (searchQuery) {
+      payload.filter_textSearch = searchQuery;
+    }
+
+    if (Array.isArray(classIds) && classIds.length > 0) {
+      payload.id_in = classIds;
+    }
 
     if (Array.isArray(centreIds) && centreIds.length > 0) {
       payload.centre_in = centreIds;
@@ -639,6 +676,25 @@ export async function fetchClassesFromLms({
             startDate
             endDate
             numberOfSessions
+            scheduleSettings {
+              startTime
+              endTime
+              repeated
+            }
+            teachers {
+              role {
+                name
+              }
+              teacher {
+                id
+                fullName
+                code
+              }
+            }
+            contactTeacher {
+              id
+              fullName
+            }
             centre {
               id
               name
@@ -661,8 +717,20 @@ export async function fetchClassesFromLms({
             slots {
               index
               date
+              startTime
+              endTime
               summary
               homework
+              teachers {
+                role {
+                  name
+                }
+                teacher {
+                  id
+                  fullName
+                  code
+                }
+              }
             }
           }
         }
@@ -691,8 +759,11 @@ export async function fetchClassesFromLms({
         .map((s: any) => ({
           index: s.index,
           date: s.date,
+          startTime: s.startTime || null,
+          endTime: s.endTime || null,
           summary: s.summary || null,
           homework: s.homework || null,
+          teachers: s.teachers || [],
         }))
         .sort((a: LmsClassSlot, b: LmsClassSlot) => a.index - b.index);
 
@@ -707,6 +778,85 @@ export async function fetchClassesFromLms({
         completed = totalSessions;
       }
       const progressPercent = totalSessions > 0 ? Math.min(100, Math.round((completed / totalSessions) * 100)) : 0;
+
+      // Tính giờ học (classTime) từ scheduleSettings hoặc từ slot đầu tiên
+      let classTime = "";
+      if (Array.isArray(c.scheduleSettings) && c.scheduleSettings.length > 0) {
+        const s0 = c.scheduleSettings[0];
+        const tStart = formatVnTimeOnly(s0.startTime);
+        const tEnd = formatVnTimeOnly(s0.endTime);
+        if (tStart && tEnd) {
+          classTime = `${tStart} - ${tEnd}`;
+        }
+      }
+      if (!classTime && slots.length > 0 && slots[0].startTime && slots[0].endTime) {
+        const tStart = formatVnTimeOnly(slots[0].startTime);
+        const tEnd = formatVnTimeOnly(slots[0].endTime);
+        if (tStart && tEnd) {
+          classTime = `${tStart} - ${tEnd}`;
+        }
+      }
+
+      // 🎯 Tìm giảng viên chính (teacherName) theo giáo viên có SỐ BUỔI DẠY NHIỀU NHẤT
+      // Nếu có nhiều hơn 1 GV có cùng số buổi dạy lớn nhất thì liệt kê tất cả
+      const teacherSlotCount = new Map<string, { fullName: string; code?: string; count: number }>();
+
+      for (const slot of slots) {
+        for (const t of (slot as any).teachers || []) {
+          const tFullName = t.teacher?.fullName?.trim();
+          const tCode = t.teacher?.code?.trim();
+          const tId = t.teacher?.id || tCode || tFullName;
+          if (!tId || !tFullName) continue;
+
+          // Bỏ qua trợ giảng / supporter nếu có
+          const rName = (t.role?.name || "").toLowerCase();
+          if (rName.includes("supporter") || rName.includes("assistant") || rName.includes("trợ giảng")) {
+            continue;
+          }
+
+          const current = teacherSlotCount.get(tId) || {
+            fullName: tFullName,
+            code: tCode || undefined,
+            count: 0,
+          };
+          current.count += 1;
+          teacherSlotCount.set(tId, current);
+        }
+      }
+
+      let maxCount = 0;
+      for (const item of teacherSlotCount.values()) {
+        if (item.count > maxCount) {
+          maxCount = item.count;
+        }
+      }
+
+      let teacherName = "";
+      let teacherCodes: string[] = [];
+
+      if (maxCount > 0) {
+        const topTeachers = Array.from(teacherSlotCount.values()).filter((item) => item.count === maxCount);
+        teacherName = topTeachers.map((t) => t.fullName).join(", ");
+        teacherCodes = topTeachers.map((t) => t.code || t.fullName).filter(Boolean);
+      }
+
+      // Fallback nếu trong slots không có thông tin teacher (hoặc chưa phân bổ slot)
+      if (!teacherName) {
+        if (Array.isArray(c.teachers) && c.teachers.length > 0) {
+          const lecturer = c.teachers.find((t: any) => {
+            const rName = (t.role?.name || "").toLowerCase();
+            return rName.includes("lecturer") || rName.includes("teacher") || rName.includes("giảng viên");
+          });
+          const chosen = lecturer?.teacher || c.teachers[0]?.teacher;
+          if (chosen) {
+            teacherName = chosen.fullName || "";
+            if (chosen.code) teacherCodes.push(chosen.code);
+          }
+        }
+        if (!teacherName && c.contactTeacher?.fullName) {
+          teacherName = c.contactTeacher.fullName;
+        }
+      }
 
       // Checkpoint 1 & 2
       const cpSessions = c.courseProcess?.checkpointSessions || [];
@@ -725,6 +875,9 @@ export async function fetchClassesFromLms({
         status: c.status,
         startDate: c.startDate || (slots.length > 0 ? slots[0].date : null),
         endDate: c.endDate || (slots.length > 0 ? slots[slots.length - 1].date : null),
+        classTime: classTime || null,
+        teacherName: teacherName || null,
+        teacherCodes: teacherCodes.length > 0 ? teacherCodes : undefined,
         numberOfSessions: totalSessions,
         completedSessions: completed,
         progressPercent,
@@ -757,5 +910,46 @@ export async function fetchClassesFromLms({
     console.error("Lỗi khi fetchClassesFromLms:", err);
     return [];
   }
+}
+
+// Lấy thông tin chi tiết một lớp học duy nhất từ LMS
+export async function fetchClassByIdFromLms(
+  classId: string,
+  token?: string
+): Promise<LmsClassItem | null> {
+  const list = await fetchClassesFromLms({
+    classIds: [classId],
+    statuses: ["OPEN", "RUNNING", "FINISHED"],
+    token,
+  });
+  return list[0] || null;
+}
+
+// Tìm kiếm lớp học theo mã lớp (tên lớp) từ LMS
+export async function searchClassByCodeFromLms({
+  classCode,
+  centreIds,
+  token,
+}: {
+  classCode: string;
+  centreIds?: string[];
+  token?: string;
+}): Promise<LmsClassItem | null> {
+  const cleanCode = classCode.trim();
+  if (!cleanCode) return null;
+
+  const list = await fetchClassesFromLms({
+    centreIds,
+    searchQuery: cleanCode,
+    statuses: ["OPEN", "RUNNING", "FINISHED"],
+    token,
+  });
+
+  // Tìm lớp khớp chính xác mã trước (không phân biệt hoa thường)
+  const exactMatch = list.find((c) => c.name.trim().toLowerCase() === cleanCode.toLowerCase());
+  if (exactMatch) return exactMatch;
+
+  // Nếu không có khớp chính xác, lấy lớp đầu tiên có chứa chuỗi tìm kiếm
+  return list[0] || null;
 }
 

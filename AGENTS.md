@@ -76,6 +76,7 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
     - Form đăng nhập hỗ trợ tính năng gợi ý tài khoản đã lưu trên trình duyệt (`autoComplete="username"`, `name="username"`).
     - Ngăn chặn trình duyệt tự động điền sẵn thông tin khi vừa tải trang thông qua cơ chế kích hoạt tương tác (`readOnly` ban đầu, tự gỡ bỏ khi người dùng nhấp/chạm vào ô nhập) để đảm bảo tính riêng tư mà vẫn mở gợi ý đầy đủ khi người dùng tương tác.
 23. **Quy Chuẩn Quy Trình Đẩy Code Git & Cập Nhật Phiên Bản (Git Push & Version Update Standard)**:
+    - **RÀNG BUỘC TUYỆT ĐỐI VỀ QUYỀN PUSH**: Agent **CHỈ ĐƯỢC PHÉP THỰC HIỆN ĐẨY CODE LÊN GIT (GIT PUSH) KHI ĐƯỢC NGƯỜI DÙNG YÊU CẦU HOẶC CHO PHÉP RÕ RÀNG**. Tuyệt đối **KHÔNG TỰ Ý CHẠY `git push`** trong bất kỳ hoàn cảnh nào nếu người dùng chưa ra lệnh.
     - Khi người dùng yêu cầu push code lên Git, Agent **bắt buộc tuân thủ đúng trình tự các bước sau**:
       1. Rà soát `.gitignore` và loại bỏ triệt để các file nhạy cảm, file tạm thời, file rác/scratch.
       2. **Cập nhật phiên bản hệ thống tập trung tại `lib/constants/version.ts`**: Khi có tính năng mới, bắt buộc tăng số hiệu phiên bản (`vx.x`, ví dụ `v1.5`), cập nhật ngày phát hành và tóm tắt các chức năng chính (ngắn gọn, không quá chuyên môn).
@@ -131,11 +132,23 @@ Agent khi thực hiện phát triển tính năng (Features), sửa lỗi (Debug
     - **Hủy liên kết Google Drive**:
       - Người dùng có thể tự hủy liên kết tài khoản Google Drive của mình tại trang Hồ sơ cá nhân (`/profile`).
       - Trong màn hình Quản lý tài khoản (`/[role]/system-management/users`), người dùng có vai trò cấp bậc cao hơn (`callerPoints < targetPoints`) có quyền hủy liên kết Google Drive cho các tài khoản cấp dưới (tuyệt đối không được hủy liên kết của chính mình tại đây hoặc của người có cấp bậc bằng/cao hơn).
-33. **Quy Chuẩn Quản Lý Lớp Học & Chi Tiết Mốc Đánh Giá Checkpoint (Class Management & Checkpoint Standard)**:
+33. **Quy Chuẩn Quản Lý Lớp Học, Hạn Nộp Bài & Lưu Trữ Supabase Độc Quyền (Class Management & Supabase Exclusive Storage Standard)**:
     - Màn hình Quản lý lớp học đặt tại **QUẢN LÝ HỆ THỐNG** với đường dẫn chuẩn: `/[role]/system-management/classes`.
-    - Tự động lọc lớp học theo danh sách cơ sở trực thuộc của tài khoản đang đăng nhập (`user_centres`) và các trạng thái: `OPEN`, `RUNNING`, `FINISHED`.
-    - Bảng hiển thị gồm các cột: STT, Mã lớp, Cơ sở, Ngày bắt đầu, Ngày kết thúc, Tiến độ buổi học (thanh tiến trình % và số buổi đã hoàn thành / tổng số buổi), Trạng thái, Thao tác (icon `Eye`).
-    - Modal xem chi tiết lớp học: Khi bấm nút Xem chi tiết, modal hiển thị thông tin lớp, 3 thẻ mốc nổi bật: **Checkpoint 1** (buổi + ngày), **Checkpoint 2** (buổi + ngày), **Sản phẩm cuối khóa** (buổi + ngày), cùng bảng danh sách lịch trình toàn bộ các buổi học và tóm tắt nội dung.
+    - **Lưu trữ độc quyền Supabase, tuyệt đối không thay đổi LMS**: Toàn bộ dữ liệu lớp học quản lý và hạn nộp bài tùy chỉnh được lưu trữ độc quyền trên Supabase Database (`system_settings` key `managed_classes` kèm fallback file local `data/managed_classes_store.json`), tuyệt đối KHÔNG làm thay đổi bất kỳ dữ liệu nào trên LMS MindX (chỉ dùng Read-only GraphQL).
+    - **Ô nhập tìm kiếm mã lớp trực tiếp (Không dùng Dropdown Combobox)**: Phía trên bảng là ô nhập mã lớp học trực tiếp (`placeholder="Nhập mã lớp học (Ví dụ: LBB-ROB-ARMA12)..."`) kèm nút **"Tìm & Thêm"** (hỗ trợ bấm Enter). Khi tìm thấy, hệ thống mở Modal chi tiết để xem trước và bấm [Thêm] để lưu vào Supabase.
+    - **Bảng danh sách chỉ hiển thị khi đã thêm vào Supabase**: Bảng tổng quan bên dưới ban đầu để trống nếu chưa có lớp nào được thêm. Bảng chỉ hiển thị dữ liệu các lớp đã được lưu trong Supabase.
+    - **Xác định Giáo viên phụ trách (dạy nhiều buổi nhất & đồng hạng)**: Giáo viên phụ trách lớp được tính dựa trên số buổi dạy (slots) nhiều nhất từ LMS. Nếu có từ 2 giáo viên cùng có số buổi dạy cao nhất bằng nhau, hiển thị đầy đủ tất cả các giáo viên đó (`GV 1, GV 2`).
+    - **Phân quyền hiển thị lớp học theo vai trò**:
+      - **Admin**: Được xem và quản lý toàn bộ các lớp thuộc các cơ sở trực thuộc của Admin (`user_centres`).
+      - **Teacher Full-time**: Chỉ xem được các lớp thuộc cơ sở trực thuộc của mình VÀ giáo viên chính phụ trách lớp đó phải là một trong các tài khoản `Teacher Part-time` hiện có trong hệ thống SMH (Supabase).
+    - **Bảng tổng quan 10 cột chuẩn**: STT, Mã Lớp & Khóa Học, Cơ Sở, Giáo Viên Phụ Trách, Giờ Học (ví dụ `18:00 - 20:00`), Ngày Bắt Đầu, Ngày Kết Thúc, Tiến Độ, Trạng Thái, Thao Tác (căn giữa toàn bộ cột trừ Mã Lớp và Cơ Sở).
+    - **Modal chi tiết lớp học & Hạn nộp bài**:
+      - Bỏ hoàn toàn cột "Tóm tắt nội dung" và 3 card mốc đánh giá riêng lẻ để bảng lịch trình được nâng cao tối đa.
+      - Hiển thị đầy đủ Giờ học và Giáo viên phụ trách.
+      - Bảng lịch trình chi tiết có cột "Hạn nộp bài" cho phép người dùng chỉnh sửa trực tiếp.
+      - Quy tắc hạn nộp bài mặc định: Buổi 1 đến Checkpoint 2 là `[Bắt đầu buổi học] - [Kết thúc buổi học, Ngày học]`. Buổi cuối (SPCK) là `[Sau thời điểm kết thúc Checkpoint 2] - [Thời điểm kết thúc buổi cuối]`.
+      - Khi thêm mới: Dưới cùng có 2 nút [Thêm] (lưu vào Supabase) và [Hủy].
+    - **Nút Tải Dữ Liệu Từ LMS & So Sánh Side-by-Side**: Khi nhấn, hệ thống đối chiếu dữ liệu hiện tại với dữ liệu thời gian thực trên LMS. Nếu phát hiện thay đổi, mở Modal so sánh đối chiếu kế bên nhau (Side-by-Side: Thuộc tính | Dữ liệu hiện tại | Dữ liệu mới từ LMS) và yêu cầu xác nhận từ người dùng trước khi cập nhật (luôn bảo lưu hạn nộp bài đã cấu hình).
 34. **Quy Chuẩn Lọc 71 Cơ Sở LMS Đang Hoạt Động (Active LMS Centres Standard)**:
     - Hệ thống tự động kiểm tra trường `isActive` từ GraphQL LMS MindX và chỉ lưu trữ / hiển thị đúng **71 cơ sở đang hoạt động (`isActive === true`)**, loại bỏ hoàn toàn 32 cơ sở đã đóng cửa hoặc hủy.
 

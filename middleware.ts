@@ -164,6 +164,7 @@ export async function middleware(request: NextRequest) {
   if (isAuthenticated && isTeacherMissingEmail) {
     const isAllowedOAuthPath =
       pathname.startsWith("/connect-google-drive") ||
+      pathname.startsWith("/privacy") ||
       pathname.startsWith("/api/auth/google") ||
       pathname.startsWith("/api/auth/logout") ||
       pathname.startsWith("/api/auth/me") ||

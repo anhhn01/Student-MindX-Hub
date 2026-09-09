@@ -20,30 +20,30 @@ export interface ReleaseVersion {
 
 // Phiên bản hiện tại mới nhất của hệ thống
 export const CURRENT_VERSION: ReleaseVersion = {
-  version: "v1.8",
+  version: "v1.9",
   releaseDate: "09/09/2026",
   title:
-    "Quản Lý Lớp Học & Mốc Đánh Giá Checkpoint, Hủy Liên Kết Google Drive & Lọc Cơ Sở Đang Hoạt Động",
+    "Tìm Kiếm Lớp Học Thời Gian Thực, Tối Ưu Hóa Google OAuth & Trang Chính Sách Quyền Riêng Tư",
   summary:
-    "Bổ sung màn hình Quản lý lớp học theo cơ sở trực thuộc với modal xem chi tiết Checkpoint 1, Checkpoint 2 và Demo cuối khóa; bổ sung tính năng Hủy liên kết Google Drive theo phân cấp vai trò và tại Hồ sơ cá nhân; tinh lọc danh mục 71 cơ sở LMS đang hoạt động.",
+    "Tích hợp tìm kiếm lớp học theo thời gian thực với dropdown gợi ý thông minh, tối ưu hóa toàn diện luồng xác thực Google OAuth & Supabase, và bổ sung trang Chính sách quyền riêng tư (/privacy) đạt chuẩn xác minh Google Cloud.",
   features: [
     {
-      title: "Quản Lý Lớp Học & Mốc Đánh Giá Checkpoint",
+      title: "Tìm Kiếm Lớp Học Thông Minh & Tùy Chỉnh Hạn Nộp Bài",
       description:
-        "Bổ sung màn hình Quản lý lớp học tại /[role]/system-management/classes, theo dõi tiến độ buổi học, trạng thái lớp (Open, Running, Finished) và modal xem chi tiết Checkpoint 1, Checkpoint 2, Sản phẩm cuối khóa cùng lịch trình buổi học.",
+        "Tự động gợi ý danh sách lớp khi gõ tìm kiếm theo thời gian thực, lọc theo phân quyền vai trò và cơ sở trực thuộc, phân công giáo viên có số buổi dạy nhiều nhất, bảo lưu tùy chỉnh hạn nộp bài và lưu trữ độc quyền trên cơ sở dữ liệu hệ thống.",
       category: "Tính Năng Mới",
     },
     {
-      title: "Hủy Liên Kết Google Drive Theo Phân Cấp Quyền Hạn",
+      title: "Trang Chính Sách Quyền Riêng Tư (/privacy)",
       description:
-        "Hỗ trợ tính năng Hủy liên kết Google Drive cho chính mình tại trang Hồ sơ cá nhân, đồng thời cho phép tài khoản có vai trò cấp bậc cao hơn hủy liên kết cho tài khoản cấp dưới trong Quản lý tài khoản.",
-      category: "Bảo Mật & Ổn Định",
+        "Xây dựng trang Chính sách quyền riêng tư đáp ứng đầy đủ tiêu chuẩn xác minh Google OAuth Consent Screen, công khai minh bạch phạm vi quyền hạn drive.file và cam kết tuân thủ chính sách Google Limited Use.",
+      category: "Tính Năng Mới",
     },
     {
-      title: "Lọc Danh Mục 71 Cơ Sở LMS Đang Hoạt Động",
+      title: "Tối Ưu Hóa Xác Thực Google OAuth & Đa Kênh Liên Kết",
       description:
-        "Tự động loại bỏ 32 cơ sở đã ngưng hoạt động trên hệ thống LMS MindX, đảm bảo toàn bộ bộ lọc và ma trận chỉ làm việc với 71 cơ sở thực tế đang vận hành.",
-      category: "Cải Tiến",
+        "Nâng cấp luồng xử lý phiên Supabase Auth khi chuyển hướng từ Google, bổ sung tùy chọn liên kết Google OAuth trực tiếp dự phòng và hiển thị thông báo lỗi trực quan.",
+      category: "Bảo Mật & Ổn Định",
     },
   ],
 };
